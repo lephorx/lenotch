@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>CFBundleName</key>
+    <string>LephorNotch</string>
+    <key>CFBundleDisplayName</key>
+    <string>LephorNotch</string>
+    <key>CFBundleExecutable</key>
+    <string>LephorNotch</string>
+    <key>CFBundleIdentifier</key>
+    <string>com.lephor.notch</string>
+    <key>CFBundlePackageType</key>
+    <string>APPL</string>
+    <key>CFBundleShortVersionString</key>
+    <string>1.0</string>
+    <key>CFBundleVersion</key>
+    <string>1</string>
+    <key>LSMinimumSystemVersion</key>
+    <string>26.0</string>
+    <key>LSUIElement</key>
+    <true/>
+    <key>NSHighResolutionCapable</key>
+    <true/>
+    <key>NSCalendarsFullAccessUsageDescription</key>
+    <string>LephorNotch shows your upcoming events in the notch.</string>
+    <key>NSCalendarsUsageDescription</key>
+    <string>LephorNotch shows your upcoming events in the notch.</string>
+    <key>NSAppleEventsUsageDescription</key>
+    <string>LephorNotch controls Spotify and Music playback from the notch.</string>
+    <key>NSDesktopFolderUsageDescription</key>
+    <string>LephorNotch keeps files you drop on the notch available in the shelf.</string>
+    <key>NSDocumentsFolderUsageDescription</key>
+    <string>LephorNotch keeps files you drop on the notch available in the shelf.</string>
+    <key>NSDownloadsFolderUsageDescription</key>
+    <string>LephorNotch keeps files you drop on the notch available in the shelf.</string>
+</dict>
+</plist>
