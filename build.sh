@@ -1,37 +1,45 @@
-#!/bin/bash
-# Builds LephorNotch.app into dist/. Pass --run to launch it afterwards.
+#!/usr/bin/env bash
+# Builds build/Lenotch.app.
+#   ./build.sh           build only
+#   ./build.sh run       build and (re)launch from build/
+#   ./build.sh install   build, copy to /Applications and launch
 set -euo pipefail
-
 cd "$(dirname "$0")"
+
 CONFIG="${CONFIG:-release}"
-APP="dist/LephorNotch.app"
+APP="build/Lenotch.app"
 
-echo "▸ compiling ($CONFIG)"
 swift build -c "$CONFIG"
-BIN="$(swift build -c "$CONFIG" --show-bin-path)/LephorNotch"
+BIN_DIR="$(swift build -c "$CONFIG" --show-bin-path)"
 
-echo "▸ assembling bundle"
 rm -rf "$APP"
 mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
-cp "$BIN" "$APP/Contents/MacOS/LephorNotch"
-cp Resources/Info.plist "$APP/Contents/Info.plist"
-printf 'APPL????' > "$APP/Contents/PkgInfo"
+cp "$BIN_DIR/Lenotch" "$APP/Contents/MacOS/"
+cp Resources/Info.plist "$APP/Contents/"
+cp -R Vendor/MediaRemoteAdapter "$APP/Contents/Resources/"
+cp Resources/logo.png Resources/AppIcon.icns "$APP/Contents/Resources/"
+codesign --force --sign - "$APP"
 
-# An ad-hoc signature with a stable identifier keeps the app's TCC grants (Automation,
-# Accessibility, Calendars) across rebuilds instead of re-prompting every launch.
-echo "▸ signing"
-codesign --force --deep \
-  --sign - \
-  --identifier com.lephor.notch \
-  --entitlements Resources/LephorNotch.entitlements \
-  --options runtime \
-  "$APP" 2>&1 | sed 's/^/  /'
+echo "Built $APP"
 
-echo "✓ $APP"
+# Quit a running copy and wait for it to exit before relaunching.
+quit_running() {
+  # LephorNotch is the app's old name.
+  pkill -x Lenotch || true
+  pkill -x LephorNotch || true
+  while pgrep -x Lenotch >/dev/null || pgrep -x LephorNotch >/dev/null; do sleep 0.1; done
+}
 
-if [[ "${1:-}" == "--run" ]]; then
-  pkill -x LephorNotch 2>/dev/null || true
-  sleep 0.3
-  open "$APP"
-  echo "✓ launched"
-fi
+case "${1:-}" in
+  run)
+    quit_running
+    open "$APP"
+    ;;
+  install)
+    quit_running
+    rm -rf /Applications/Lenotch.app /Applications/LephorNotch.app
+    cp -R "$APP" /Applications/
+    open /Applications/Lenotch.app
+    echo "Installed to /Applications"
+    ;;
+esac

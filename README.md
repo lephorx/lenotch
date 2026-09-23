@@ -1,66 +1,51 @@
-# LephorNotch
+# Lenotch
 
-A macOS notch companion in SwiftUI. The notch stays black where the hardware cutout is and
-melts into Liquid Glass as it extends past it, so the panel reads as the notch *growing*
-rather than a window sitting under it.
+A black SwiftUI notch for MacBooks with a Now Playing live activity.
 
-![requires macOS 26+](https://img.shields.io/badge/macOS-26%2B-black) ![Swift 6](https://img.shields.io/badge/Swift-6-orange)
+- **Closed:** blends into the physical notch.
+- **Playing:** the notch widens to show the album art on the left and animated bars on the right.
+- **Open** (hover or click, you choose) has two tabs:
+  - **Now Playing:** artwork, title, artist, a progress bar you can drag to seek, play/pause and skip, shuffle and repeat, and a favorite button (Apple Music).
+  - **Shelf:** drop files on the notch to keep them, drag them back out, or AirDrop them. Dragging a file onto the closed notch opens the shelf.
+  (The camera button in the header drops a small mirrored camera preview down beside the notch.)
 
-## What it does
+  Swipe left or right with two fingers to switch tabs.
+- **Battery and clock** in the open notch.
+- **Audio source:** Playing Right Now (any app), Spotify, Apple Music or YouTube Music.
+  Spotify and Music are read over AppleScript, so the notch follows them even when another
+  app owns Now Playing. macOS asks once for permission.
+- **Appearance:** solid black, or black on top fading into Liquid Glass (macOS 26+).
+  The equalizer and progress bar can be tinted with the main colour of the album art.
+- **Setup and Settings:** a first-launch setup, and a Settings window (menu bar icon → Settings…) where everything can be turned on or off.
+- **Real audio visualizer:** the bars in the collapsed notch follow the actual sound (Core Audio tap, macOS 14.2+).
+- On displays without a notch, a virtual notch is drawn at the top centre.
 
-| | |
-|---|---|
-| **Now Playing** | Spotify and Apple Music — artwork, scrubbing, shuffle/repeat, transport. Artwork colours tint the glass. |
-| **Calendar** | Month grid with per-day event dots, plus the agenda for the selected day (EventKit). |
-| **Shelf** | Drop files on the notch; drag them back out anywhere. Survives relaunch via security-scoped bookmarks. |
-| **Battery** | Percentage, charge state, time remaining, Low Power Mode (IOKit). |
-| **System HUD** | Custom volume and brightness readouts rendered inside the notch, replacing the stock macOS HUD. |
+Ideas that aren't built yet are listed in [IDEAS.md](IDEAS.md).
 
-Two appearances: **Liquid Glass** (black at the top, progressively transparent glass below)
-and **Pure Black**.
+## Build & run
 
-## Build
+Requires macOS 14+ and Xcode / Swift 6 toolchain.
 
 ```bash
-./build.sh --run      # compile, bundle, ad-hoc sign, launch
-CONFIG=debug ./build.sh
+./build.sh run       # build build/Lenotch.app and launch it
+./build.sh install   # copy to /Applications and launch
 ```
-
-Output is `dist/LephorNotch.app`. It runs as a menu-bar accessory (`LSUIElement`), so there's
-no Dock icon — use the status item or the notch itself.
-
-## Permissions
-
-The app asks for these on first use. All are optional; each feature degrades on its own.
-
-- **Automation** (Spotify / Music) — playback control and track info.
-- **Calendars** — the calendar tab.
-- **Accessibility** — lets the app capture the volume/brightness keys so macOS doesn't draw
-  its own HUD next to ours. Without it the keys still work and the HUD still appears, but the
-  system HUD shows too.
-
-Settings › *Hide the built-in macOS HUD* additionally retires `OSDUIHelper` on a timer, which
-is the only way to keep the stock overlay off screen — macOS relaunches it on demand.
-
-## Notes on the implementation
-
-- **The window never resizes.** The panel is always as large as the widest state; only the
-  SwiftUI content animates. Resizing an `NSWindow` mid-spring is what makes notch apps stutter.
-- **`NotchShape`** draws concave shoulders at the top and normal rounded corners at the
-  bottom, with both radii animatable.
-- **Brightness** has no public API on Apple Silicon. `DisplayServices` is `dlopen`ed, so a
-  missing symbol degrades to "brightness unavailable" instead of failing to launch.
-- **The spectrum bars are decorative.** macOS won't hand you another app's audio without a
-  virtual device, so they're a seeded random walk, not an FFT.
-- **Ad-hoc signing uses a stable identifier** (`com.lephor.notch`) so TCC grants survive
-  rebuilds instead of re-prompting on every launch.
 
 ## Layout
 
 ```
-Sources/LephorNotch/
-  App/        main, AppDelegate, NotchPanel (borderless non-activating NSPanel)
-  Core/       geometry detection, view model, settings, theme, colour extraction
-  Services/   media, battery, calendar, audio, brightness, HUD key tap, shelf
-  UI/         notch shape & background, collapsed + expanded content, panels
+Sources/Lenotch/
+  App/       SwiftUI App entry (MenuBarExtra), app delegate, settings, window presenter
+  Notch/     panel window, placement, hover open/close, geometry
+  Media/     NowPlayingService + providers (MediaRemote adapter, AppleScript)
+  UI/        notch views: shape, background, live activity, player, battery
+  Shelf/     file shelf store and view (drag & drop, AirDrop)
+  System/    battery monitor
+  Settings/  settings window and first-launch setup
+  Audio/     system audio tap and spectrum analysis for the visualizer
+scripts/make_icon.sh         regenerates Resources/AppIcon.icns from the logo
+Vendor/MediaRemoteAdapter/   BSD-3 licensed, see its LICENSE
 ```
+
+Since macOS 15.4 third-party apps can't read MediaRemote directly, so Now Playing
+runs [mediaremote-adapter](https://github.com/ungive/mediaremote-adapter) via `/usr/bin/perl`.
