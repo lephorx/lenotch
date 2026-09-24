@@ -42,8 +42,8 @@ The DMG opens with a compact drag-to-Applications window with a curved arrow.
 The artwork is stored inside the app bundle so Finder shows no installer support
 files, and the build checks that the universal image stays below 4 MB.
 
-Sparkle 2 checks the public [Lenotch updates](https://github.com/lephorx/lenotch-updates)
-feed for updates while the app source stays private. Choose **Check for Updates…**
+Sparkle 2 checks the `appcast.xml` of the [latest release](https://github.com/lephorx/lenotch/releases/latest)
+for updates. Choose **Check for Updates…**
 from the menu bar icon to check manually, or enable automatic checks in General
 settings. Sparkle asks about background checks on the second launch.
 
@@ -52,12 +52,12 @@ settings. Sparkle asks about background checks on the second launch.
 GitHub Actions ([build-dmg.yml](.github/workflows/build-dmg.yml)) builds a universal
 `Lenotch.dmg` on pushes to `main`, `dev` or `lenotch-rewrite`, and on pull requests
 (download it from the run's artifacts). Pushing a version tag publishes the DMG,
-its SHA-256 checksum, and a signed `appcast.xml` as a GitHub Release. Release
-builds require the `SPARKLE_PRIVATE_KEY` Actions secret containing the private
-key for the public key in `Resources/Info.plist`, and the repository-scoped
-`LENOTCH_UPDATES_DEPLOY_KEY` secret to publish the DMG and appcast to the public
-updates repository. The Sparkle private key is stored locally in Keychain under
-the `com.lephorx.Lenotch` account.
+its SHA-256 checksum, and a signed `appcast.xml` as a GitHub Release; the app's
+update feed is `releases/latest/download/appcast.xml`, so every release is picked
+up automatically. Release builds require the `SPARKLE_PRIVATE_KEY` Actions secret
+containing the private key for the public key in `Resources/Info.plist`. The
+Sparkle private key is stored locally in Keychain under the `com.lephorx.Lenotch`
+account.
 Tag the commit on `main` after merging `dev`:
 
 ```bash
