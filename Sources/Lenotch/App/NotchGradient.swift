@@ -43,7 +43,7 @@ struct NotchGradient: Codable, Equatable {
     var bottom: RGBAColor
     var start: Double
     var length: Double
-    /// Use the current song's artwork colour instead of `bottom` (keeping its opacity).
+    /// Add the current song's artwork colour as a localized glow and bottom rim.
     var bottomFollowsMusic = false
 
     init(top: RGBAColor, bottom: RGBAColor, start: Double, length: Double, bottomFollowsMusic: Bool = false) {
@@ -62,17 +62,6 @@ struct NotchGradient: Codable, Equatable {
         start = try container.decode(Double.self, forKey: .start)
         length = try container.decode(Double.self, forKey: .length)
         bottomFollowsMusic = try container.decodeIfPresent(Bool.self, forKey: .bottomFollowsMusic) ?? false
-    }
-
-    /// This gradient with a subdued version of the music colour at the bottom.
-    func resolved(musicColor: Color?) -> NotchGradient {
-        guard bottomFollowsMusic, let musicColor else { return self }
-        var copy = self
-        // A full-strength artwork accent makes the whole notch too bright.
-        var bottom = RGBAColor(musicColor).mixed(with: .black, 0.72)
-        bottom.alpha = self.bottom.alpha
-        copy.bottom = bottom
-        return copy
     }
 
     /// Solid black, as before custom gradients existed.

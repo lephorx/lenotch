@@ -95,9 +95,10 @@ final class NotchViewModel {
     /// `nil` means the default (white) progress fill.
     var progressColor: Color? { settings.tintProgressBar ? accentColor : nil }
 
-    /// Colour transition for the current style, with the song colour applied if enabled.
+    /// Colour transition for the current style. Music colour is drawn as a
+    /// local glow in the background instead of tinting the whole lower edge.
     var backgroundGradient: NotchGradient {
-        settings.gradient(for: settings.appearance).resolved(musicColor: accentColor)
+        settings.gradient(for: settings.appearance)
     }
 
     func toggleMirror() {

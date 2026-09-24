@@ -326,8 +326,7 @@ private struct GradientSettings: View {
     var body: some View {
         Section {
             ColorPicker("Top colour", selection: color(\.top), supportsOpacity: false)
-            ColorPicker(gradient.wrappedValue.bottomFollowsMusic ? "Bottom colour when nothing plays" : "Bottom colour",
-                        selection: color(\.bottom), supportsOpacity: false)
+            ColorPicker("Bottom colour", selection: color(\.bottom), supportsOpacity: false)
             LabeledContent("Transition starts") {
                 percentSlider(gradient.start)
             }
@@ -342,7 +341,7 @@ private struct GradientSettings: View {
             Text("Colours")
         } footer: {
             Text(gradient.wrappedValue.bottomFollowsMusic
-                 ? "The notch fades from the top colour into the song's colour (Music → Colours from the album art)."
+                 ? "The song's colour glows in the lower left and traces the bottom edge (Music → Colours from the album art)."
                  : "The notch fades from the top colour into the bottom colour. The strip beside the hardware notch always uses the top colour.")
         }
     }
@@ -424,7 +423,7 @@ private struct MusicSettings: View {
                 } header: {
                     Text("Colours from the album art")
                 } footer: {
-                    Text("Uses the current cover for a soft, dark colour glow behind the music (\(settings.appearance.title) style).")
+                    Text("Uses the current cover for a soft colour glow in the lower left and a fine line along the bottom (\(settings.appearance.title) style).")
                 }
                 Section {
                     // Turning it on starts the audio tap, which is what makes macOS ask.
