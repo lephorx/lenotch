@@ -32,10 +32,13 @@ struct ProgressBar: View {
             let isDragging = dragProgress != nil
             let height: CGFloat = isDragging ? 7 : 4
             let fillWidth = proxy.size.width * min(max(progress, 0), 1)
+            let fillColor = model.progressColor ?? .white
             ZStack(alignment: .leading) {
                 Capsule().fill(.white.opacity(0.18))
-                Capsule().fill(model.progressColor ?? .white)
+                Capsule().fill(fillColor)
                     .frame(width: fillWidth > 0 ? max(height, fillWidth) : 0)
+                    .shadow(color: fillWidth > 0 ? fillColor.opacity(0.72) : .clear, radius: 5)
+                    .shadow(color: fillWidth > 0 ? fillColor.opacity(0.38) : .clear, radius: 12)
             }
             .frame(height: height)
             .frame(maxHeight: .infinity)
