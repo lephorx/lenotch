@@ -21,27 +21,27 @@ struct NotchBackground: View {
                 LinearGradient(stops: gradient.stops(solidFraction: solidFraction),
                                startPoint: .top, endPoint: .bottom)
                 if let musicColor, isOpen {
-                    // The cover lights the left side of the panel, fading to
-                    // near-black by the controls on the right.
+                    // Keep the album colour near the cover in the lower left.
+                    // The top stays black and the right side remains quiet.
                     RadialGradient(colors: [
-                        musicColor.opacity(appearance == .glass ? 0.36 : 0.46),
-                        musicColor.opacity(0.16),
+                        musicColor.opacity(appearance == .glass ? 0.30 : 0.42),
+                        musicColor.opacity(0.13),
                         .clear
-                    ], center: UnitPoint(x: 0.16, y: 0.58), startRadius: 0,
-                       endRadius: proxy.size.width * 0.54)
+                    ], center: UnitPoint(x: 0.12, y: 0.98), startRadius: 0,
+                       endRadius: proxy.size.width * 0.58)
                         .mask {
                             LinearGradient(stops: [
                                 .init(color: .clear, location: 0),
                                 .init(color: .clear, location: solidFraction),
-                                .init(color: .white, location: min(solidFraction + 0.12, 1)),
+                                .init(color: .white, location: min(solidFraction + 0.48, 1)),
                                 .init(color: .white, location: 1)
                             ], startPoint: .top, endPoint: .bottom)
                         }
                     // A narrow rim carries that colour along the bottom edge.
                     shape.stroke(
-                        LinearGradient(colors: [musicColor.opacity(0.75),
-                                                musicColor.opacity(0.54),
-                                                musicColor.opacity(0.36)],
+                        LinearGradient(colors: [musicColor.opacity(0.8),
+                                                musicColor.opacity(0.55),
+                                                musicColor.opacity(0.28)],
                                        startPoint: .leading, endPoint: .trailing),
                         lineWidth: 2
                     )
