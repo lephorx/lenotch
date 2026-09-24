@@ -44,7 +44,7 @@ struct ExpandedView: View {
                     }
                 }
                 .frame(width: 400)
-                if model.isCalendarAllowed {
+                if model.showsCalendar {
                     CalendarPanel(model: model, width: 200)
                 }
             }

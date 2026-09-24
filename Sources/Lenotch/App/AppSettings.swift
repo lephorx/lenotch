@@ -58,6 +58,8 @@ final class AppSettings {
     /// Seconds the pointer has to rest on the notch before it opens in hover mode.
     var hoverDelay: Double { didSet { save(hoverDelay, "hoverDelay") } }
     var showBatteryPercentage: Bool { didSet { save(showBatteryPercentage, "showBatteryPercentage") } }
+    /// Show the calendar next to the music (it also needs calendar permission).
+    var showCalendar: Bool { didSet { save(showCalendar, "showCalendar") } }
 
     // MARK: Appearance
     var appearance: Appearance { didSet { save(appearance.rawValue, "appearance") } }
@@ -133,6 +135,7 @@ final class AppSettings {
         peekShortcut = shortcut("peekShortcut", .peekDefault)
         hoverDelay = defaults.object(forKey: "hoverDelay") as? Double ?? 0.12
         showBatteryPercentage = bool("showBatteryPercentage", true)
+        showCalendar = bool("showCalendar", true)
         appearance = defaults.string(forKey: "appearance").flatMap(Appearance.init) ?? .black
         func gradient(_ key: String, _ fallback: NotchGradient) -> NotchGradient {
             defaults.data(forKey: key).flatMap { try? JSONDecoder().decode(NotchGradient.self, from: $0) } ?? fallback

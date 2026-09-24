@@ -116,6 +116,8 @@ final class NotchViewModel {
 
     // Features that need a permission stay out of the notch until it's allowed.
     var isCalendarAllowed: Bool { EKEventStore.authorizationStatus(for: .event) == .fullAccess }
+    /// Calendar beside the music: switched on in Settings and allowed.
+    var showsCalendar: Bool { settings.showCalendar && isCalendarAllowed }
     var isCameraAllowed: Bool { AVCaptureDevice.authorizationStatus(for: .video) == .authorized }
     var openWidth: CGFloat { openSize(for: visiblePage).width }
 
@@ -124,7 +126,7 @@ final class NotchViewModel {
         switch page {
         case .player:
             // Music alone is narrower than music with the calendar beside it.
-            return isCalendarAllowed ? geometry.openSize : geometry.openSize(contentWidth: 460, bodyHeight: 166)
+            return showsCalendar ? geometry.openSize : geometry.openSize(contentWidth: 460, bodyHeight: 166)
         case .shelf:
             return geometry.openSize(contentWidth: 500, bodyHeight: 150)
         case .aiUsage:

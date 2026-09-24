@@ -110,6 +110,14 @@ private struct GeneralSettings: View {
 
     var body: some View {
         Form {
+            Section {
+                Toggle("Calendar next to the music", isOn: $settings.showCalendar)
+                Toggle("AirDrop on the shelf", isOn: $settings.showAirDrop)
+            } header: {
+                Text("Features")
+            } footer: {
+                Text("The calendar also needs calendar access (Permissions).")
+            }
             Section("Opening") {
                 Picker("Open the notch on", selection: $settings.openMode) {
                     ForEach(OpenMode.allCases) { Text($0.title).tag($0) }
@@ -323,7 +331,6 @@ private struct ShelfSettings: View {
                 Toggle("Open the shelf when dragging files onto the notch", isOn: $settings.openShelfOnDrag)
                 Toggle("Keep files on the shelf after restarting", isOn: $settings.keepShelfItems)
                     .onChange(of: settings.keepShelfItems) { shelf.persist() }
-                Toggle("Show AirDrop target", isOn: $settings.showAirDrop)
             }
             Section {
                 LabeledContent("\(shelf.items.count) item\(shelf.items.count == 1 ? "" : "s") on the shelf") {
