@@ -1,0 +1,10 @@
+{
+  "name": "OpenRouter",
+  "url": "https://openrouter.ai/api/v1/auth/key",
+  "apiKeyFile": "~/.config/openrouter/key",
+  "mode": "usedAndLimit",
+  "value": "data.usage",
+  "limit": "data.limit",
+  "label": "Credits",
+  "symbol": "arrow.triangle.branch"
+}

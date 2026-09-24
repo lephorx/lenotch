@@ -56,6 +56,8 @@ enum ProviderGlyph {
     /// SVG in the app bundle's resources.
     case image(String)
     case symbol(String)
+    /// A custom logo file; `template` tints it white like the built-in marks.
+    case file(URL, template: Bool)
 }
 
 /// A user-defined usage source: any HTTP endpoint that returns JSON.
@@ -92,14 +94,34 @@ struct CustomAIProvider: Codable, Equatable, Identifiable {
     /// Optional: when the limit resets (ISO 8601 date or Unix seconds).
     var resetPath = ""
     var label = "Usage"
+    /// Custom logo: a file name in the Logos folder, or a path next to a config file.
+    var logoPath: String?
+    /// Tint the logo white like the built-in marks (nil means yes).
+    var tintLogo: Bool?
+    /// Read the API key from this file (e.g. `~/.config/openrouter/key`) instead of the keychain.
+    var apiKeyFile: String?
+    /// Set for providers loaded from a config file in the Providers folder.
+    var configFile: String?
 
     var key: String { "custom:\(id.uuidString)" }
+
+    var logoURL: URL? {
+        guard let logoPath, !logoPath.isEmpty else { return nil }
+        let expanded = (logoPath as NSString).expandingTildeInPath
+        return expanded.hasPrefix("/") ? URL(fileURLWithPath: expanded)
+            : ProviderConfigStore.logosFolder.appendingPathComponent(logoPath)
+    }
 
     // MARK: API key (kept in the keychain, never in preferences)
 
     private static let keychainService = "com.lephorx.Lenotch.custom-provider"
 
+    /// The key file if one is set, otherwise the keychain.
     var apiKey: String? {
+        if let apiKeyFile, !apiKeyFile.isEmpty {
+            let path = (apiKeyFile as NSString).expandingTildeInPath
+            return (try? String(contentsOfFile: path, encoding: .utf8))?.trimmingCharacters(in: .whitespacesAndNewlines)
+        }
         let query: [CFString: Any] = [
             kSecClass: kSecClassGenericPassword, kSecAttrService: Self.keychainService,
             kSecAttrAccount: id.uuidString, kSecReturnData: true, kSecMatchLimit: kSecMatchLimitOne,
@@ -143,11 +165,11 @@ struct UsageSource: Identifiable, Equatable {
     init(_ provider: CustomAIProvider) {
         id = provider.key
         title = provider.name
-        glyph = .symbol(provider.symbol)
+        glyph = provider.logoURL.map { .file($0, template: provider.tintLogo ?? true) } ?? .symbol(provider.symbol)
         custom = provider
     }
 
-    /// Resolves a saved key ("claude", "custom:<uuid>") against the custom providers.
+    /// Resolves a saved key ("claude", "custom:<uuid>") against the custom and config providers.
     static func resolve(_ key: String, customs: [CustomAIProvider]) -> UsageSource? {
         if let provider = AIProvider(rawValue: key) { return UsageSource(provider) }
         return customs.first { $0.key == key }.map(UsageSource.init)
@@ -177,7 +199,29 @@ struct ProviderGlyphView: View {
             Image(systemName: name)
                 .font(.system(size: size * 0.8, weight: .semibold))
                 .frame(width: size, height: size)
+        case .file(let url, let template):
+            if let image = Self.logo(at: url, template: template) {
+                Image(nsImage: image)
+                    .renderingMode(template ? .template : .original)
+                    .resizable()
+                    .aspectRatio(contentMode: .fit)
+                    .frame(width: size, height: size)
+            } else {
+                Image(systemName: "questionmark.circle").frame(width: size, height: size)
+            }
         }
+    }
+
+    /// Custom logos are decoded small (they're drawn at ~20 pt) and cached.
+    private static func logo(at url: URL, template: Bool) -> NSImage? {
+        let key = "\(url.path)|\(template)"
+        if let cached = cache[key] { return cached }
+        let image = url.pathExtension.lowercased() == "svg" || url.pathExtension.lowercased() == "pdf"
+            ? NSImage(contentsOf: url)
+            : (try? Data(contentsOf: url)).flatMap { ImageDownsampling.image(from: $0, maxPixelSize: 96) }
+        image?.isTemplate = template
+        cache[key] = image
+        return image
     }
 
     private static var cache: [String: NSImage] = [:]

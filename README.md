@@ -20,6 +20,8 @@ A black SwiftUI notch for MacBooks with a Now Playing live activity.
 - **Real audio visualizer:** the bars in the collapsed notch follow the actual sound (Core Audio tap, macOS 14.2+).
 - On displays without a notch, a virtual notch is drawn at the top centre.
 
+Custom AI usage providers (with their own logos) can be added in Settings or as config files: see [docs/provider-config.md](docs/provider-config.md).
+
 Ideas that aren't built yet are listed in [IDEAS.md](IDEAS.md).
 
 ## Build & run

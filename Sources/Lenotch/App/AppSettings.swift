@@ -88,9 +88,27 @@ final class AppSettings {
         didSet { defaults.set(try? JSONEncoder().encode(customProviders), forKey: "customProviders") }
     }
 
+    /// Providers loaded from config files in the Providers folder (not saved here).
+    private(set) var configProviders: [CustomAIProvider] = []
+
+    /// Hand-made and config-file custom providers together.
+    var allCustomProviders: [CustomAIProvider] { customProviders + configProviders }
+
     /// The enabled sources, resolved, in order.
     var usageSources: [UsageSource] {
-        usageSourceKeys.compactMap { UsageSource.resolve($0, customs: customProviders) }
+        usageSourceKeys.compactMap { UsageSource.resolve($0, customs: allCustomProviders) }
+    }
+
+    /// Re-reads the Providers folder. Configs seen for the first time are switched on;
+    /// ones switched off stay off.
+    func reloadProviderConfigs() {
+        configProviders = ProviderConfigStore.loadAll()
+        var known = Set(defaults.stringArray(forKey: "knownProviderConfigs") ?? [])
+        for provider in configProviders where !known.contains(provider.key) {
+            known.insert(provider.key)
+            if !usageSourceKeys.contains(provider.key) { usageSourceKeys.append(provider.key) }
+        }
+        defaults.set(Array(known), forKey: "knownProviderConfigs")
     }
 
     // MARK: Shelf
@@ -142,6 +160,7 @@ final class AppSettings {
         keepShelfItems = bool("keepShelfItems", true)
         openShelfOnDrag = bool("openShelfOnDrag", true)
         showAirDrop = bool("showAirDrop", true)
+        reloadProviderConfigs()
     }
 
     /// The app used to be called LephorNotch (bundle ID com.lephorx.LephorNotch).

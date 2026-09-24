@@ -1,7 +1,7 @@
 import SwiftUI
 
 /// Settings tab for the AI Usage widget: which providers show, in which order
-/// (drag to reorder), and user-defined custom providers.
+/// (drag to reorder), custom providers made here, and providers from config files.
 struct AIUsageSettings: View {
     @Bindable var settings: AppSettings
 
@@ -9,7 +9,7 @@ struct AIUsageSettings: View {
 
     /// Every source, enabled ones first in their saved order.
     private var allKeys: [String] {
-        let all = AIProvider.allCases.map(\.rawValue) + settings.customProviders.map(\.key)
+        let all = AIProvider.allCases.map(\.rawValue) + settings.allCustomProviders.map(\.key)
         return settings.usageSourceKeys.filter(all.contains) + all.filter { !settings.usageSourceKeys.contains($0) }
     }
 
@@ -34,10 +34,10 @@ struct AIUsageSettings: View {
             List {
                 Section("Providers") {
                     ForEach(allKeys, id: \.self) { key in
-                        if let source = UsageSource.resolve(key, customs: settings.customProviders) {
+                        if let source = UsageSource.resolve(key, customs: settings.allCustomProviders) {
                             SourceRow(source: source,
                                       isOn: binding(for: key),
-                                      edit: source.custom.map { custom in { editing = custom } })
+                                      edit: source.custom.map { custom in { edit(custom) } })
                         }
                     }
                     .onMove(perform: move)
@@ -47,25 +47,61 @@ struct AIUsageSettings: View {
             .disabled(!settings.aiUsageEnabled)
             .opacity(settings.aiUsageEnabled ? 1 : 0.5)
 
-            HStack {
+            HStack(spacing: 8) {
                 Button {
                     editing = CustomAIProvider()
                 } label: {
                     Label("Add Custom Provider…", systemImage: "plus")
                 }
+                Button("Import Config…", action: importConfig)
                 Spacer()
-                Text("Sign-ins are read from each tool; Lenotch never stores a login.")
-                    .font(.system(size: 10))
-                    .foregroundStyle(.secondary)
+                Button {
+                    ProviderConfigStore.ensureFolders()
+                    NSWorkspace.shared.open(ProviderConfigStore.providersFolder)
+                } label: {
+                    Label("Config Folder", systemImage: "folder")
+                }
+                Button {
+                    settings.reloadProviderConfigs()
+                } label: {
+                    Label("Reload", systemImage: "arrow.clockwise")
+                }
             }
             .padding(.horizontal, 20)
-            .padding(.bottom, 16)
+            Text("Configs are JSON files in the Providers folder (see docs/provider-config.md). Sign-ins are read from each tool; Lenotch never stores a login.")
+                .font(.system(size: 10))
+                .foregroundStyle(.secondary)
+                .padding(.horizontal, 20)
+                .padding(.bottom, 14)
         }
         .sheet(item: $editing) { provider in
             CustomProviderEditor(provider: provider,
                                  isNew: !settings.customProviders.contains { $0.id == provider.id },
                                  save: save, delete: delete)
         }
+    }
+
+    /// Hand-made providers open the editor; config providers open their file.
+    private func edit(_ provider: CustomAIProvider) {
+        if let file = provider.configFile {
+            NSWorkspace.shared.open(ProviderConfigStore.providersFolder.appendingPathComponent(file))
+        } else {
+            editing = provider
+        }
+    }
+
+    private func importConfig() {
+        let panel = NSOpenPanel()
+        panel.allowedContentTypes = [.json]
+        panel.allowsMultipleSelection = true
+        panel.message = "Choose provider config files to import"
+        guard panel.runModal() == .OK else { return }
+        for url in panel.urls {
+            do { try ProviderConfigStore.importConfig(from: url) } catch {
+                NSLog("Lenotch: couldn't import \(url.lastPathComponent): \(error)")
+            }
+        }
+        settings.reloadProviderConfigs()
     }
 
     private func binding(for key: String) -> Binding<Bool> {
@@ -120,7 +156,16 @@ private struct SourceRow: View {
             }
             .frame(width: 26, height: 26)
             VStack(alignment: .leading, spacing: 1) {
-                Text(source.title).font(.system(size: 13, weight: .medium))
+                HStack(spacing: 6) {
+                    Text(source.title).font(.system(size: 13, weight: .medium))
+                    if source.custom?.configFile != nil {
+                        Text("Config")
+                            .font(.system(size: 9, weight: .semibold))
+                            .padding(.horizontal, 5)
+                            .padding(.vertical, 1)
+                            .background(Capsule().fill(Color.accentColor.opacity(0.2)))
+                    }
+                }
                 Text(source.custom.map { $0.url.isEmpty ? "Custom endpoint" : $0.url }
                         ?? AIProvider(rawValue: source.id)?.source ?? "")
                     .font(.system(size: 10))
@@ -130,7 +175,8 @@ private struct SourceRow: View {
             }
             Spacer()
             if let edit {
-                Button("Edit…", action: edit).buttonStyle(.borderless)
+                Button(source.custom?.configFile != nil ? "Open File" : "Edit…", action: edit)
+                    .buttonStyle(.borderless)
             }
             Toggle("", isOn: $isOn).labelsHidden().toggleStyle(.switch).controlSize(.small)
         }
@@ -159,10 +205,38 @@ private struct CustomProviderEditor: View {
             Form {
                 Section("Provider") {
                     TextField("Name", text: $provider.name)
-                    Picker("Symbol", selection: $provider.symbol) {
-                        ForEach(Self.symbols, id: \.self) { Label($0, systemImage: $0).tag($0) }
-                    }
                     TextField("Label", text: $provider.label, prompt: Text("Usage"))
+                }
+                Section {
+                    HStack(spacing: 12) {
+                        ZStack {
+                            Circle().fill(Color.black)
+                            ProviderGlyphView(glyph: UsageSource(provider).glyph, size: 20).foregroundStyle(.white)
+                        }
+                        .frame(width: 40, height: 40)
+                        VStack(alignment: .leading, spacing: 6) {
+                            HStack {
+                                Button("Choose Logo…", action: chooseLogo)
+                                if provider.logoPath != nil {
+                                    Button("Remove") { provider.logoPath = nil }.buttonStyle(.borderless)
+                                }
+                            }
+                            if provider.logoPath != nil {
+                                Toggle("Tint white like the other logos", isOn: Binding(
+                                    get: { provider.tintLogo ?? true }, set: { provider.tintLogo = $0 }))
+                                    .controlSize(.small)
+                            }
+                        }
+                    }
+                    if provider.logoPath == nil {
+                        Picker("Symbol", selection: $provider.symbol) {
+                            ForEach(Self.symbols, id: \.self) { Label($0, systemImage: $0).tag($0) }
+                        }
+                    }
+                } header: {
+                    Text("Logo")
+                } footer: {
+                    Text("PNG, JPEG, SVG or PDF. Without a logo, the symbol is shown.")
                 }
                 Section {
                     TextField("URL", text: $provider.url, prompt: Text("https://api.example.com/v1/usage"))
@@ -170,6 +244,10 @@ private struct CustomProviderEditor: View {
                     TextField("Prefix", text: $provider.authPrefix, prompt: Text("Bearer "))
                     SecureField(isNew ? "API key" : "API key (leave empty to keep)", text: $apiKey)
                         .onChange(of: apiKey) { keyEdited = true }
+                    TextField("…or read the key from a file", text: Binding(
+                        get: { provider.apiKeyFile ?? "" },
+                        set: { provider.apiKeyFile = $0.isEmpty ? nil : $0 }),
+                              prompt: Text("~/.config/provider/key"))
                 } header: {
                     Text("Request")
                 } footer: {
@@ -204,6 +282,8 @@ private struct CustomProviderEditor: View {
                 if !isNew {
                     Button("Delete", role: .destructive) { delete(provider) }
                 }
+                Button("Export Config…", action: exportConfig)
+                    .disabled(provider.url.isEmpty || provider.valuePath.isEmpty)
                 Spacer()
                 Button("Cancel") { dismiss() }.keyboardShortcut(.cancelAction)
                 Button(isNew ? "Add" : "Save") { save(provider, keyEdited ? apiKey : nil) }
@@ -212,7 +292,7 @@ private struct CustomProviderEditor: View {
             }
             .padding(16)
         }
-        .frame(width: 480, height: 600)
+        .frame(width: 500, height: 680)
     }
 
     @ViewBuilder
@@ -226,6 +306,26 @@ private struct CustomProviderEditor: View {
             Text(message).foregroundStyle(.orange)
         default:
             EmptyView()
+        }
+    }
+
+    private func chooseLogo() {
+        let panel = NSOpenPanel()
+        panel.allowedContentTypes = [.png, .jpeg, .svg, .pdf, .heic, .tiff]
+        panel.message = "Choose a logo for \(provider.name)"
+        guard panel.runModal() == .OK, let url = panel.url,
+              let stored = try? ProviderConfigStore.storeLogo(from: url) else { return }
+        provider.logoPath = stored
+    }
+
+    /// Saves this provider as a shareable config with the logo embedded (without the API key).
+    private func exportConfig() {
+        let panel = NSSavePanel()
+        panel.allowedContentTypes = [.json]
+        panel.nameFieldStringValue = provider.name.lowercased().replacingOccurrences(of: " ", with: "-") + ".json"
+        guard panel.runModal() == .OK, let url = panel.url else { return }
+        do { try ProviderConfigStore.export(provider, to: url) } catch {
+            NSLog("Lenotch: couldn't export config: \(error)")
         }
     }
 
