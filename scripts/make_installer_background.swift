@@ -2,7 +2,8 @@ import AppKit
 
 // Run from the repository root to regenerate the Finder installer artwork.
 let width = 600
-let height = 300
+// Slightly taller than Finder's visible area so no unpainted strip appears.
+let height = 340
 let scale = 2
 let output = URL(fileURLWithPath: "Resources/installer-background.png")
 
@@ -19,29 +20,39 @@ NSGraphicsContext.saveGraphicsState()
 NSGraphicsContext.current = graphics
 graphics.cgContext.scaleBy(x: CGFloat(scale), y: CGFloat(scale))
 
-NSColor(srgbRed: 206 / 255, green: 225 / 255, blue: 252 / 255, alpha: 1).setFill()
-NSRect(x: 0, y: 0, width: width, height: height).fill()
+let background = NSGradient(starting: NSColor(srgbRed: 19 / 255, green: 29 / 255, blue: 48 / 255, alpha: 1),
+                            ending: NSColor(srgbRed: 10 / 255, green: 16 / 255, blue: 29 / 255, alpha: 1))!
+background.draw(in: NSRect(x: 0, y: 0, width: width, height: height), angle: 90)
 
-// A soft S curve leads from the app icon to the Applications shortcut.
+// Finder can render dark icon captions even over a dark picture. These small
+// neutral plates keep either caption color legible.
+for center in [155.0, 445.0] {
+    let plate = NSBezierPath(roundedRect: NSRect(x: center - 70, y: 85, width: 140, height: 25),
+                             xRadius: 12.5, yRadius: 12.5)
+    NSColor(srgbRed: 148 / 255, green: 165 / 255, blue: 190 / 255, alpha: 0.62).setFill()
+    plate.fill()
+}
+
+// One continuous curve points from Lenotch to Applications.
 let arrow = NSBezierPath()
-arrow.move(to: NSPoint(x: 247, y: 145))
-arrow.curve(to: NSPoint(x: 296, y: 164),
-            controlPoint1: NSPoint(x: 268, y: 185),
-            controlPoint2: NSPoint(x: 278, y: 186))
-arrow.curve(to: NSPoint(x: 349, y: 149),
-            controlPoint1: NSPoint(x: 319, y: 137),
-            controlPoint2: NSPoint(x: 327, y: 129))
-arrow.lineWidth = 5
+arrow.move(to: NSPoint(x: 245, y: 185))
+arrow.curve(to: NSPoint(x: 295, y: 194),
+            controlPoint1: NSPoint(x: 262, y: 218),
+            controlPoint2: NSPoint(x: 277, y: 222))
+arrow.curve(to: NSPoint(x: 350, y: 185),
+            controlPoint1: NSPoint(x: 314, y: 166),
+            controlPoint2: NSPoint(x: 332, y: 185))
+arrow.lineWidth = 4.5
 arrow.lineCapStyle = .round
 arrow.lineJoinStyle = .round
-NSColor(srgbRed: 48 / 255, green: 97 / 255, blue: 167 / 255, alpha: 0.85).setStroke()
+NSColor(srgbRed: 110 / 255, green: 192 / 255, blue: 244 / 255, alpha: 0.9).setStroke()
 arrow.stroke()
 
 let head = NSBezierPath()
-head.move(to: NSPoint(x: 333, y: 163))
-head.line(to: NSPoint(x: 349, y: 149))
-head.line(to: NSPoint(x: 331, y: 140))
-head.lineWidth = 5
+head.move(to: NSPoint(x: 332, y: 201))
+head.line(to: NSPoint(x: 350, y: 185))
+head.line(to: NSPoint(x: 332, y: 169))
+head.lineWidth = 4.5
 head.lineCapStyle = .round
 head.lineJoinStyle = .round
 head.stroke()

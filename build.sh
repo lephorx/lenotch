@@ -83,7 +83,18 @@ case "${1:-}" in
       --skip-finalize \
       "$DMG" "$STAGE"
     hdiutil attach -readwrite -nobrowse -mountpoint "$MOUNT" "$DMG" -quiet
-    osascript scripts/style_dmg.applescript "$(basename "$MOUNT")" "$MOUNT"
+    STYLED=0
+    for attempt in 1 2 3 4 5; do
+      if osascript scripts/style_dmg.applescript "$(basename "$MOUNT")" "$MOUNT"; then
+        STYLED=1
+        break
+      fi
+      sleep 2
+    done
+    if [ "$STYLED" -ne 1 ]; then
+      echo "Finder could not style the installer window" >&2
+      exit 1
+    fi
     hdiutil detach "$MOUNT" -quiet
     rm -f "${DMG%.dmg}-compressed.dmg"
     hdiutil convert "$DMG" -format UDZO -o "${DMG%.dmg}-compressed.dmg" -quiet
