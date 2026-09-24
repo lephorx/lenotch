@@ -8,6 +8,8 @@ struct NotchGeometry: Equatable {
     let centerX: CGFloat
     let notchSize: CGSize
     static let openBodyHeight: CGFloat = 166
+    /// Tallest a tab can be (the expanded calendar's month grid); the window is this tall.
+    static let maxBodyHeight: CGFloat = 236
     static let openWidth: CGFloat = 688
 
     init(screen: NSScreen) {
@@ -52,12 +54,12 @@ struct NotchGeometry: Equatable {
     /// enough for the header (tabs and buttons either side of the notch) and within the largest size.
     func openSize(contentWidth: CGFloat, bodyHeight: CGFloat) -> CGSize {
         CGSize(width: min(max(contentWidth, notchSize.width + 340), openSize.width),
-               height: notchSize.height + min(bodyHeight, Self.openBodyHeight))
+               height: notchSize.height + min(bodyHeight, Self.maxBodyHeight))
     }
 
     /// The window is sized for the widest page; the black shape animates inside it.
     var windowFrame: NSRect {
-        let size = openSize
+        let size = CGSize(width: openSize.width, height: notchSize.height + Self.maxBodyHeight)
         let width = size.width + 2 * NotchShape.openTopRadius
         return NSRect(x: centerX - width / 2, y: screenFrame.maxY - size.height,
                       width: width, height: size.height)

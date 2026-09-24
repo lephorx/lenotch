@@ -56,7 +56,7 @@ struct ExpandedView: View {
                 }
             } else if model.showsCalendar {
                 // Without music the calendar takes the whole tab.
-                CalendarPanel(model: model, width: model.openWidth - 60)
+                CalendarPanel(model: model, width: model.openWidth - 60, expanded: true)
                     .slideIn(0)
             } else {
                 HomeView(model: model)

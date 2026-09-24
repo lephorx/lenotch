@@ -6,20 +6,36 @@ import SwiftUI
 struct CalendarPanel: View {
     let model: NotchViewModel
     let width: CGFloat
+    /// When the calendar has the tab to itself: a month grid with the day's events beside it.
+    var expanded = false
 
     private var calendar: CalendarService { model.calendar }
 
     var body: some View {
         TimelineView(.everyMinute) { context in
-            VStack(alignment: .leading, spacing: 6) {
-                Text(calendar.selectedDay, format: .dateTime.month(.wide).year())
-                    .font(.system(size: 12, weight: .semibold))
-                    .foregroundStyle(.white.opacity(0.75))
-                    .contentTransition(.numericText())
-                    .animation(.easeOut(duration: 0.2), value: calendar.selectedDay)
-                DayStrip(calendar: calendar, width: width)
-                    .onHover { model.isOverHorizontalScroller = $0 }
-                content(now: context.date)
+            if expanded {
+                HStack(alignment: .top, spacing: 26) {
+                    MonthGrid(calendar: calendar)
+                        .frame(width: 250)
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text(calendar.selectedDay, format: .dateTime.weekday(.wide).day().month(.wide))
+                            .font(.system(size: 13, weight: .semibold))
+                            .foregroundStyle(.white.opacity(0.85))
+                        content(now: context.date)
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                }
+            } else {
+                VStack(alignment: .leading, spacing: 6) {
+                    Text(calendar.selectedDay, format: .dateTime.month(.wide).year())
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundStyle(.white.opacity(0.75))
+                        .contentTransition(.numericText())
+                        .animation(.easeOut(duration: 0.2), value: calendar.selectedDay)
+                    DayStrip(calendar: calendar, width: width)
+                        .onHover { model.isOverHorizontalScroller = $0 }
+                    content(now: context.date)
+                }
             }
         }
         .frame(width: width, alignment: .leading)
