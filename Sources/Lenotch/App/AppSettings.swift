@@ -60,6 +60,10 @@ final class AppSettings {
     var showBatteryPercentage: Bool { didSet { save(showBatteryPercentage, "showBatteryPercentage") } }
     /// Show the calendar next to the music (it also needs calendar permission).
     var showCalendar: Bool { didSet { save(showCalendar, "showCalendar") } }
+    /// Reminders under the day's events (also needs reminders permission).
+    var showReminders: Bool { didSet { save(showReminders, "showReminders") } }
+    /// The camera mirror button in the notch (also needs camera permission).
+    var showMirror: Bool { didSet { save(showMirror, "showMirror") } }
     var autoScrollCalendar: Bool { didSet { save(autoScrollCalendar, "autoScrollCalendar") } }
     var showFullEventTitles: Bool { didSet { save(showFullEventTitles, "showFullEventTitles") } }
     var hiddenCalendarIDs: Set<String> { didSet { save(Array(hiddenCalendarIDs), "hiddenCalendarIDs") } }
@@ -140,6 +144,8 @@ final class AppSettings {
         hoverDelay = defaults.object(forKey: "hoverDelay") as? Double ?? 0.12
         showBatteryPercentage = bool("showBatteryPercentage", true)
         showCalendar = bool("showCalendar", true)
+        showReminders = bool("showReminders", true)
+        showMirror = bool("showMirror", true)
         autoScrollCalendar = bool("autoScrollCalendar", true)
         showFullEventTitles = bool("showFullEventTitles", false)
         hiddenCalendarIDs = Set(defaults.stringArray(forKey: "hiddenCalendarIDs") ?? [])

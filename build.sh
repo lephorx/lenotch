@@ -9,6 +9,7 @@
 #   CONFIG=debug|release      build configuration (default release)
 #   ARCHS="arm64 x86_64"      architectures (default: this Mac's)
 #   VERSION=2.1 BUILD=42      override the app's version and build number
+#   SIGN_IDENTITY="…"          signing identity (default: your Apple Development cert, else ad-hoc)
 set -euo pipefail
 cd "$(dirname "$0")"
 
@@ -46,7 +47,13 @@ rm -rf "$SPARKLE_DEST/Versions/B/XPCServices" "$SPARKLE_DEST/XPCServices"
 codesign --force --sign - "$SPARKLE_DEST/Versions/B/Autoupdate"
 codesign --force --sign - "$SPARKLE_DEST/Versions/B/Updater.app"
 codesign --force --sign - "$SPARKLE_DEST"
-codesign --force --sign - "$APP"
+# Sign with a real certificate when there is one: macOS keeps permissions (calendar,
+# camera, automation…) for the same signer across builds. Ad-hoc signatures are tied
+# to the exact binary, so every rebuild would lose them. SIGN_IDENTITY=- forces ad-hoc.
+IDENTITY="${SIGN_IDENTITY:-$(security find-identity -v -p codesigning 2>/dev/null \
+  | sed -n 's/.*"\(Apple Development: [^"]*\)".*/\1/p' | head -1)}"
+codesign --force --sign "${IDENTITY:--}" "$APP"
+echo "Signed with: ${IDENTITY:-ad-hoc}"
 
 echo "Built $APP"
 
