@@ -25,8 +25,6 @@ A black SwiftUI notch for MacBooks with a Now Playing live activity.
 
 Custom AI usage providers (with their own logos) can be added in Settings or as config files: see [docs/provider-config.md](docs/provider-config.md).
 
-Ideas that aren't built yet are listed in [IDEAS.md](IDEAS.md).
-
 ## Build & run
 
 Requires macOS 14+ and Xcode / Swift 6 toolchain. Building the installer DMG also
