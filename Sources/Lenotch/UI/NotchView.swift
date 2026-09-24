@@ -38,7 +38,10 @@ struct NotchView: View {
     @ViewBuilder
     private var content: some View {
         if model.isShowingIntro {
-            IntroView(notchHeight: model.geometry.notchSize.height) { model.isShowingIntro = false }
+            IntroView(notchHeight: model.geometry.notchSize.height) {
+                model.isShowingIntro = false
+            }
+                .id(model.introGeneration)
                 .transition(.opacity)
         } else if model.isShowingAppearancePreview {
             AppearanceLivePreview(notchHeight: model.geometry.notchSize.height)

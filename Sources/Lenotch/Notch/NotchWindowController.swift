@@ -13,6 +13,7 @@ final class NotchWindowController {
     private let model: NotchViewModel
     private var monitors: [Any] = []
     private var pendingTransition: DispatchWorkItem?
+    private var introEnd: DispatchWorkItem?
     /// Drag pasteboard change count at the last mouse down; a change while
     /// dragging means files (or other content) are being dragged.
     private var dragChangeCount = NSPasteboard(name: .drag).changeCount
@@ -185,7 +186,22 @@ final class NotchWindowController {
         hideAppearancePreview()
         setState(.closed)
         cancelPending()
+        peekEnd?.cancel()
+        model.isPeeking = false
+        panel.ignoresMouseEvents = true
+        introEnd?.cancel()
+        model.introGeneration = UUID()
         model.isShowingIntro = true
+        // SwiftUI may cancel the view's animation task during a rapid replay or
+        // window change. Never leave an expanded, noninteractive notch behind.
+        let generation = model.introGeneration
+        let end = DispatchWorkItem { [weak self] in
+            guard let self, self.model.introGeneration == generation else { return }
+            self.model.isShowingIntro = false
+            self.introEnd = nil
+        }
+        introEnd = end
+        DispatchQueue.main.asyncAfter(deadline: .now() + 4, execute: end)
     }
 
     func showAppearancePreview() {
@@ -393,7 +409,7 @@ final class NotchWindowController {
                 }
             }
             let page = self.model.visiblePage.rawValue
-            let status = "state=\(self.model.state) page=\(page)/\(self.model.pages.count) mirror=\(self.model.isMirrorVisible) camera=\(self.model.camera.status)\n"
+            let status = "state=\(self.model.state) intro=\(self.model.isShowingIntro) page=\(page)/\(self.model.pages.count) mirror=\(self.model.isMirrorVisible) camera=\(self.model.camera.status)\n"
             try? status.write(toFile: output, atomically: true, encoding: .utf8)
         }
     }
