@@ -2,7 +2,7 @@ name: Build and release DMG
 
 on:
   push:
-    branches: [main, lenotch-rewrite]
+    branches: [main, dev, lenotch-rewrite]
     tags: ["v*"]
   pull_request:
   workflow_dispatch:
