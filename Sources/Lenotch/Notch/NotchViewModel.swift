@@ -32,6 +32,8 @@ final class NotchViewModel {
     var state: State = .closed
     /// The first-launch intro is playing (the notch ignores the pointer meanwhile).
     var isShowingIntro = false
+    /// Keeps the chosen appearance visible while the setup opacity slider is adjusted.
+    var isShowingAppearancePreview = false
     /// Briefly showing the current song under the closed notch.
     var isPeeking = false
     var selectedPage: NotchPage = .player
@@ -45,6 +47,7 @@ final class NotchViewModel {
     let visualizer: AudioVisualizer
     let camera = CameraMirror()
     let calendar: CalendarService
+    let weather: WeatherService
     let aiUsage = AIUsageService()
     /// The AI usage ring under the pointer, for the bubble below the notch.
     private(set) var usageHover: UsageHover?
@@ -58,6 +61,9 @@ final class NotchViewModel {
     /// Pointer is over a sideways-scrolling area (the calendar's day strip), where
     /// two-finger swipes scroll instead of switching tabs.
     var isOverHorizontalScroller = false
+    /// Pointer is over a vertically scrolling list (the calendar's events), where
+    /// swiping up scrolls instead of closing the notch.
+    var isOverVerticalScroller = false
     /// The camera popup beside the notch; closes with the notch or on a second click.
     var isMirrorVisible = false
     let openSettings: () -> Void
@@ -69,6 +75,7 @@ final class NotchViewModel {
         self.media = media
         self.settings = settings
         self.calendar = CalendarService(settings: settings)
+        self.weather = WeatherService(settings: settings)
         self.battery = battery
         self.shelf = shelf
         self.visualizer = visualizer
@@ -109,7 +116,13 @@ final class NotchViewModel {
 
     /// Tabs shown in the notch; AI Usage only once it's switched on in Settings.
     var pages: [NotchPage] {
-        NotchPage.allCases.filter { $0 != .aiUsage || settings.aiUsageEnabled }
+        NotchPage.allCases.filter { page in
+            switch page {
+            case .player: true
+            case .shelf: settings.showsShelfTab
+            case .aiUsage: settings.aiUsageEnabled
+            }
+        }
     }
 
     /// The selected tab, falling back to the player when it's been switched off.
@@ -126,10 +139,21 @@ final class NotchViewModel {
     func openSize(for page: NotchPage) -> CGSize {
         switch page {
         case .player:
-            // Music alone is narrower than music with the calendar beside it.
-            return showsCalendar ? geometry.openSize : geometry.openSize(contentWidth: 460, bodyHeight: 166)
+            switch (settings.showMusic, showsCalendar) {
+            case (true, true): return geometry.openSize
+            case (true, false): return geometry.openSize(contentWidth: 460, bodyHeight: 166)
+            // The calendar alone stretches across a mid-sized tab.
+            case (false, true):
+                // The month grid needs the taller tab; the day strip keeps the usual height.
+                return settings.expandedCalendarStyle == .month
+                    ? geometry.openSize(contentWidth: 600, bodyHeight: NotchGeometry.maxBodyHeight)
+                    : geometry.openSize(contentWidth: 580, bodyHeight: 166)
+            // Neither: logo, name, time and the weather.
+            case (false, false): return geometry.openSize(contentWidth: 540, bodyHeight: 150)
+            }
         case .shelf:
-            return geometry.openSize(contentWidth: 500, bodyHeight: 150)
+            // AirDrop alone is a smaller tab, stretched across it.
+            return geometry.openSize(contentWidth: settings.showFileShelf ? 500 : 380, bodyHeight: 150)
         case .aiUsage:
             // Rings: 8 per row at most, two rows at most.
             let count = min(max(visibleUsageCount, 1), 16)
@@ -153,10 +177,17 @@ final class NotchViewModel {
     /// Switches pages with a slide in the matching direction.
     func select(_ page: NotchPage) {
         guard page != visiblePage else { return }
+        // Set the direction first and switch on the next run-loop turn, so the
+        // outgoing page already knows which way to leave.
         pageMovesForward = page.rawValue > visiblePage.rawValue
-        withAnimation(.spring(response: 0.42, dampingFraction: 0.84)) { selectedPage = page }
-        onOpenSizeChange?()
+        DispatchQueue.main.async {
+            // One spring for the content, the selection pill and the notch's resize.
+            withAnimation(Self.pageSpring) { self.selectedPage = page }
+            self.onOpenSizeChange?()
+        }
     }
+
+    static let pageSpring = Animation.spring(response: 0.46, dampingFraction: 0.86)
 
     /// Moves to the next (+1) or previous (-1) page; used by swipes.
     func selectPage(offset: Int) {
@@ -165,7 +196,7 @@ final class NotchViewModel {
     }
 
     var currentSize: CGSize {
-        if isShowingIntro { return geometry.introSize }
+        if isShowingIntro || isShowingAppearancePreview { return geometry.introSize }
         if isPeeking, state == .closed { return geometry.peekSize }
         return switch state {
         case .open: openSize(for: visiblePage)

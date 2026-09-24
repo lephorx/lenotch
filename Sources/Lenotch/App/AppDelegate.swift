@@ -26,6 +26,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private let windows = WindowPresenter()
     private var notch: NotchWindowController?
 
+    /// Opening Lenotch again (Finder, Spotlight) shows Settings — the way back
+    /// when the menu bar icon is hidden.
+    func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
+        showSettings()
+        return false
+    }
+
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSApp.setActivationPolicy(.accessory)
         settings.onAudioSourceChange = { [weak self] source in self?.media.setSource(source) }
@@ -93,7 +100,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     func showOnboarding() {
         // Floating, so it stays in view while macOS permission prompts come and go.
         windows.show(id: "onboarding", title: "Welcome to Lenotch", floating: true) {
-            OnboardingView(settings: settings, permissions: permissions) { [weak self] in
+            OnboardingView(settings: settings, permissions: permissions,
+                           showAppearancePreview: { [weak self] in self?.notch?.showAppearancePreview() },
+                           hideAppearancePreview: { [weak self] in self?.notch?.hideAppearancePreview() }) { [weak self] in
                 guard let self else { return }
                 let isFirstSetup = !settings.hasCompletedOnboarding
                 settings.hasCompletedOnboarding = true

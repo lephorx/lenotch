@@ -34,8 +34,9 @@ struct AIUsageView: View {
                 VStack(spacing: compact ? 8 : 0) {
                     ForEach(rows.indices, id: \.self) { index in
                         HStack(alignment: .top, spacing: compact ? 18 : 26) {
-                            ForEach(rows[index], id: \.0.id) { source, usage in
-                                RingCell(model: model, source: source, usage: usage, diameter: compact ? 40 : 52)
+                            ForEach(Array(rows[index].enumerated()), id: \.element.0.id) { position, item in
+                                RingCell(model: model, source: item.0, usage: item.1, diameter: compact ? 40 : 52)
+                                    .slideIn(index * 8 + position)
                             }
                         }
                     }

@@ -15,7 +15,7 @@ struct IconView: View {
                                      startPoint: .top, endPoint: .bottom))
             // Soft light behind the logo.
             tile.fill(RadialGradient(colors: [.white.opacity(0.14), .clear],
-                                     center: UnitPoint(x: 0.5, y: 0.62), startRadius: 0, endRadius: 430))
+                                     center: UnitPoint(x: 0.54, y: 0.58), startRadius: 0, endRadius: 430))
             // The notch, flush with the top edge.
             NotchOutline()
                 .fill(.black)
@@ -26,7 +26,8 @@ struct IconView: View {
                 .aspectRatio(contentMode: .fit)
                 .frame(height: 400)
                 .shadow(color: .white.opacity(0.35), radius: 36)
-                .offset(y: 50)
+                // An L's weight sits bottom-left, so nudge it up and right to look centred.
+                .offset(x: 36, y: 14)
         }
         .frame(width: 824, height: 824)
         .clipShape(tile)

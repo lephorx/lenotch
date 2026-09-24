@@ -22,6 +22,20 @@ enum Appearance: String, CaseIterable, Identifiable {
     }
 }
 
+/// How the calendar looks when it has the first tab to itself (music off).
+enum ExpandedCalendarStyle: String, CaseIterable, Identifiable {
+    case month, strip
+
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .month: "Month view"
+        case .strip: "Day strip"
+        }
+    }
+}
+
 enum OpenMode: String, CaseIterable, Identifiable {
     case hover
     case click
@@ -58,8 +72,21 @@ final class AppSettings {
     /// Seconds the pointer has to rest on the notch before it opens in hover mode.
     var hoverDelay: Double { didSet { save(hoverDelay, "hoverDelay") } }
     var showBatteryPercentage: Bool { didSet { save(showBatteryPercentage, "showBatteryPercentage") } }
+    /// The Lenotch icon in the menu bar. When hidden, Settings is reached from the
+    /// notch's gear or by opening the app again.
+    var showMenuBarIcon: Bool { didSet { save(showMenuBarIcon, "showMenuBarIcon") } }
     /// Show the calendar next to the music (it also needs calendar permission).
     var showCalendar: Bool { didSet { save(showCalendar, "showCalendar") } }
+    /// The music player in the first tab; off leaves the calendar (or the weather home view).
+    var showMusic: Bool { didSet { save(showMusic, "showMusic") } }
+    var expandedCalendarStyle: ExpandedCalendarStyle {
+        didSet { save(expandedCalendarStyle.rawValue, "expandedCalendarStyle") }
+    }
+    /// Place for the weather in the home view (a typed city or the user's location).
+    var weatherPlace: WeatherPlace? {
+        didSet { defaults.set(weatherPlace.flatMap { try? JSONEncoder().encode($0) }, forKey: "weatherPlace") }
+    }
+    var weatherFahrenheit: Bool { didSet { save(weatherFahrenheit, "weatherFahrenheit") } }
     /// Reminders under the day's events (also needs reminders permission).
     var showReminders: Bool { didSet { save(showReminders, "showReminders") } }
     /// The camera mirror button in the notch (also needs camera permission).
@@ -125,6 +152,15 @@ final class AppSettings {
     var keepShelfItems: Bool { didSet { save(keepShelfItems, "keepShelfItems") } }
     var openShelfOnDrag: Bool { didSet { save(openShelfOnDrag, "openShelfOnDrag") } }
     var showAirDrop: Bool { didSet { save(showAirDrop, "showAirDrop") } }
+    /// The whole shelf tab.
+    var showShelfTab: Bool { didSet { save(showShelfTab, "showShelfTab") } }
+    /// The "Drop files here" shelf inside the tab; without it AirDrop fills the tab.
+    var showFileShelf: Bool { didSet { save(showFileShelf, "showFileShelf") } }
+
+    /// The shelf tab has something to show (the file shelf or AirDrop).
+    var hasShelfContent: Bool { showFileShelf || showAirDrop }
+    /// The shelf tab is in the notch: switched on and not empty.
+    var showsShelfTab: Bool { showShelfTab && hasShelfContent }
 
     init(defaults: UserDefaults = .standard) {
         self.defaults = defaults
@@ -143,7 +179,13 @@ final class AppSettings {
         peekShortcut = shortcut("peekShortcut", .peekDefault)
         hoverDelay = defaults.object(forKey: "hoverDelay") as? Double ?? 0.12
         showBatteryPercentage = bool("showBatteryPercentage", true)
+        showMenuBarIcon = bool("showMenuBarIcon", true)
         showCalendar = bool("showCalendar", true)
+        showMusic = bool("showMusic", true)
+        expandedCalendarStyle = defaults.string(forKey: "expandedCalendarStyle")
+            .flatMap(ExpandedCalendarStyle.init) ?? .month
+        weatherPlace = defaults.data(forKey: "weatherPlace").flatMap { try? JSONDecoder().decode(WeatherPlace.self, from: $0) }
+        weatherFahrenheit = bool("weatherFahrenheit", Locale.current.measurementSystem == .us)
         showReminders = bool("showReminders", true)
         showMirror = bool("showMirror", true)
         autoScrollCalendar = bool("autoScrollCalendar", true)
@@ -177,6 +219,8 @@ final class AppSettings {
         keepShelfItems = bool("keepShelfItems", true)
         openShelfOnDrag = bool("openShelfOnDrag", true)
         showAirDrop = bool("showAirDrop", true)
+        showShelfTab = bool("showShelfTab", true)
+        showFileShelf = bool("showFileShelf", true)
         reloadProviderConfigs()
     }
 

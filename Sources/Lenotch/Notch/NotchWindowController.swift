@@ -28,6 +28,10 @@ final class NotchWindowController {
     private static let swipeThreshold: CGFloat = 60
 
     private var swipeDistance: CGFloat = 0
+    private var verticalSwipeDistance: CGFloat = 0
+    /// After a swipe closes the notch, hovering doesn't reopen it until the pointer
+    /// has left the notch once.
+    private var hoverOpenBlocked = false
     private var swipeHandled = false
     private var lastScroll = Date.distantPast
 
@@ -122,27 +126,47 @@ final class NotchWindowController {
 
     /// Two-finger horizontal swipes (trackpad or Magic Mouse) switch tabs, once per gesture.
     /// Returns nil when the event was used for a swipe.
+    /// Two-finger swipes on the open notch: sideways switches tabs, up closes it.
     private func handleSwipe(_ event: NSEvent) -> NSEvent? {
-        guard model.state == .open, model.pages.count > 1,
-              !model.isOverHorizontalScroller else { return event }
+        guard model.state == .open else { return event }
         #if DEBUG
         if debugHoldOpen { return event }
         #endif
-        // A full shelf scrolls sideways instead (about five files fit without scrolling).
-        if model.visiblePage == .shelf, model.shelf.items.count > 5 { return event }
+        // Sideways swipes scroll the calendar's day strip and a full shelf instead
+        // (about five files fit without scrolling); vertical ones scroll the event list.
+        let canSwitchTabs = model.pages.count > 1 && !model.isOverHorizontalScroller
+            && !(model.visiblePage == .shelf && model.shelf.items.count > 5)
+        let canClose = !model.isOverVerticalScroller
         // Ignore the inertia that keeps scrolling after the fingers lift.
         guard event.momentumPhase.isEmpty else { return swipeHandled ? nil : event }
 
         let now = Date()
         if event.phase.contains(.began) || (event.phase.isEmpty && now.timeIntervalSince(lastScroll) > 0.35) {
             swipeDistance = 0
+            verticalSwipeDistance = 0
             swipeHandled = false
         }
         lastScroll = now
 
+        // Normalise to finger movement regardless of the natural scrolling setting
+        // (right and up are positive).
+        let inverted = event.isDirectionInvertedFromDevice
         if abs(event.scrollingDeltaX) > abs(event.scrollingDeltaY) {
-            // Normalise to finger movement regardless of the natural scrolling setting.
-            swipeDistance += event.isDirectionInvertedFromDevice ? event.scrollingDeltaX : -event.scrollingDeltaX
+            guard canSwitchTabs else { return event }
+            swipeDistance += inverted ? event.scrollingDeltaX : -event.scrollingDeltaX
+        } else {
+            guard canClose else { return event }
+            verticalSwipeDistance += inverted ? -event.scrollingDeltaY : event.scrollingDeltaY
+        }
+
+        if !swipeHandled, verticalSwipeDistance > Self.swipeThreshold {
+            swipeHandled = true
+            // Fingers moving up close the notch, like flicking it back into the menu bar.
+            cancelPending()
+            setState(.closed)
+            hoverOpenBlocked = true
+            NSHapticFeedbackManager.defaultPerformer.perform(.generic, performanceTime: .now)
+            return nil
         }
 
         if !swipeHandled, abs(swipeDistance) > Self.swipeThreshold {
@@ -158,14 +182,31 @@ final class NotchWindowController {
     /// Plays the logo intro in the notch.
     func playIntro() {
         guard !model.isShowingIntro else { return }
+        hideAppearancePreview()
         setState(.closed)
         cancelPending()
         model.isShowingIntro = true
     }
 
+    func showAppearancePreview() {
+        guard !model.isShowingIntro else { return }
+        cancelPending()
+        setState(.closed)
+        peekEnd?.cancel()
+        model.isPeeking = false
+        model.isShowingAppearancePreview = true
+        panel.ignoresMouseEvents = true
+    }
+
+    func hideAppearancePreview() {
+        guard model.isShowingAppearancePreview else { return }
+        model.isShowingAppearancePreview = false
+        panel.ignoresMouseEvents = true
+    }
+
     /// Keyboard shortcut: opens or closes the notch wherever the pointer is.
     func toggleOpen() {
-        guard !model.isShowingIntro else { return }
+        guard !model.isShowingIntro, !model.isShowingAppearancePreview else { return }
         cancelPending()
         if model.state == .open {
             setState(.closed)
@@ -183,7 +224,8 @@ final class NotchWindowController {
             model.isPeeking = false
             return
         }
-        guard model.state == .closed, !model.isShowingIntro, model.media.track != nil else { return }
+        guard model.state == .closed, !model.isShowingIntro,
+              !model.isShowingAppearancePreview, model.media.track != nil else { return }
         peekEnd?.cancel()
         model.isPeeking = true
         let end = DispatchWorkItem { [weak self] in self?.model.isPeeking = false }
@@ -192,7 +234,7 @@ final class NotchWindowController {
     }
 
     private func handle(_ event: NSEvent) {
-        guard !model.isShowingIntro else { return }
+        guard !model.isShowingIntro, !model.isShowingAppearancePreview else { return }
         let location = NSEvent.mouseLocation
         let geometry = model.geometry
         let settings = model.settings
@@ -207,16 +249,17 @@ final class NotchWindowController {
             let hotZone = geometry.rect(for: model.currentSize).insetBy(dx: -6, dy: -2)
             guard hotZone.contains(location) else {
                 cancelPending()
+                hoverOpenBlocked = false
                 return
             }
 
-            if event.type == .leftMouseDragged, isDraggingContent, settings.openShelfOnDrag {
+            if event.type == .leftMouseDragged, isDraggingContent, settings.openShelfOnDrag, settings.showsShelfTab {
                 cancelPending()
                 model.selectedPage = .shelf
                 setState(.open)
             } else if settings.openMode == .click {
                 if event.type == .leftMouseDown { setState(.open) }
-            } else if event.type == .mouseMoved {
+            } else if event.type == .mouseMoved, !hoverOpenBlocked {
                 schedule(after: settings.hoverDelay) { [weak self] in self?.setState(.open) }
             }
 
@@ -327,6 +370,11 @@ final class NotchWindowController {
                 case "intro": self.playIntro()
                 case "peek": self.peek()
                 case "settings":
+                    // "settings music" opens a specific page (closing an open window first).
+                    if parts.count == 2, let page = SettingsSection(rawValue: parts[1]) {
+                        SettingsView.initialSection = page
+                        NSApp.windows.first { $0.title.contains("Settings") }?.close()
+                    }
                     self.model.openSettings()
                     DispatchQueue.main.asyncAfter(deadline: .now() + 1) {
                         if let window = NSApp.windows.first(where: { $0.title.contains("Settings") }) {

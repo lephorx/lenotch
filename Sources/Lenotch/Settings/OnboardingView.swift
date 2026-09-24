@@ -5,6 +5,8 @@ import SwiftUI
 struct OnboardingView: View {
     @Bindable var settings: AppSettings
     let permissions: PermissionCenter
+    let showAppearancePreview: () -> Void
+    let hideAppearancePreview: () -> Void
     let finish: () -> Void
 
     private static let lastStep = 2
@@ -20,8 +22,15 @@ struct OnboardingView: View {
                     SourcePicker(selection: $settings.audioSource)
                         .transition(.push(from: .trailing).combined(with: .opacity))
                 case 1:
-                    AppearancePicker(settings: settings)
-                        .transition(.push(from: .trailing).combined(with: .opacity))
+                    VStack(spacing: 14) {
+                        AppearancePicker(settings: settings)
+                        if settings.appearance == .glass {
+                            glassOpacity
+                                .transition(.opacity.combined(with: .move(edge: .top)))
+                        }
+                    }
+                    .animation(.easeInOut(duration: 0.2), value: settings.appearance)
+                    .transition(.push(from: .trailing).combined(with: .opacity))
                 default:
                     PermissionsView(permissions: permissions, settings: settings)
                         .transition(.push(from: .trailing).combined(with: .opacity))
@@ -35,6 +44,11 @@ struct OnboardingView: View {
         .padding(.bottom, 24)
         .frame(width: 560)
         .animation(.spring(response: 0.4, dampingFraction: 0.85), value: step)
+        .onChange(of: step) { oldStep, newStep in
+            if newStep == 1 { showAppearancePreview() }
+            else if oldStep == 1 { hideAppearancePreview() }
+        }
+        .onDisappear(perform: hideAppearancePreview)
     }
 
     private var header: some View {
@@ -51,7 +65,7 @@ struct OnboardingView: View {
             Text(["Welcome to Lenotch", "Choose a Style", "Permissions"][step])
                 .font(.system(size: 22, weight: .bold))
             Text(["Which app should the notch show music from?",
-                  "How should the notch look when it opens?",
+                  "See the notch above as you choose its style and opacity.",
                   "Allow only what you want to use. You can change this any time in Settings."][step])
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
@@ -78,5 +92,28 @@ struct OnboardingView: View {
             .keyboardShortcut(.defaultAction)
             .controlSize(.large)
         }
+    }
+
+    /// How dark the glass gets towards the bottom (the glass style's "Bottom opacity").
+    private var glassOpacity: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            HStack {
+                Text("Glass opacity").font(.system(size: 13, weight: .semibold))
+                Spacer()
+                Text(settings.glassGradient.bottom.alpha, format: .percent.precision(.fractionLength(0)))
+                    .monospacedDigit()
+                    .foregroundStyle(.secondary)
+            }
+            HStack(spacing: 10) {
+                Text("Clear").font(.system(size: 11)).foregroundStyle(.secondary)
+                Slider(value: $settings.glassGradient.bottom.alpha, in: 0...1)
+                Text("Dark").font(.system(size: 11)).foregroundStyle(.secondary)
+            }
+            Text("How much the glass darkens towards the bottom. Higher is easier to read over bright or busy backgrounds.")
+                .font(.system(size: 11))
+                .foregroundStyle(.secondary)
+        }
+        .padding(12)
+        .background(RoundedRectangle(cornerRadius: 12, style: .continuous).fill(Color.primary.opacity(0.04)))
     }
 }

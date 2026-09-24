@@ -40,6 +40,10 @@
 	<string>Lenotch shows your camera in the notch as a quick mirror. Nothing is recorded.</string>
 	<key>NSHighResolutionCapable</key>
 	<true/>
+	<key>NSLocationUsageDescription</key>
+	<string>Lenotch uses your location only when you choose Use my location, to show your local weather.</string>
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>Lenotch uses your location only when you choose Use my location, to show your local weather.</string>
 	<key>NSRemindersFullAccessUsageDescription</key>
 	<string>Lenotch shows reminders from the lists you choose next to your calendar events in the notch.</string>
 	<key>SUFeedURL</key>

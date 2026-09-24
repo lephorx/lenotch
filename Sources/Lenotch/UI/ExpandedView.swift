@@ -12,22 +12,26 @@ struct ExpandedView: View {
         VStack(spacing: 0) {
             header
                 .frame(height: model.geometry.notchSize.height)
+            // The new tab's items slide in one by one (`slideIn`); the old tab just fades.
             pageContent
+                .environment(\.pageMovesForward, model.pageMovesForward)
                 .id(model.visiblePage)
-                .transition(.push(from: model.pageMovesForward ? .trailing : .leading)
-                    .combined(with: .opacity)
-                    .combined(with: .blurReplace))
+                .transition(.asymmetric(insertion: .identity,
+                                        removal: .opacity.animation(.easeOut(duration: 0.12))))
                 .padding(.horizontal, 30)
                 .padding(.bottom, 20)
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
                 .clipped()
         }
+        // Files dropped on the notch go on the shelf when the file shelf is on.
         .onDrop(of: [.fileURL], isTargeted: $isDropTargeted) { providers in
+            guard settings.showsShelfTab, settings.showFileShelf else { return false }
             ShelfStore.loadURLs(from: providers) { model.shelf.add($0) }
             return true
         }
+        // Dragging files over the notch opens the shelf tab (also for AirDrop alone).
         .onChange(of: isDropTargeted) { _, targeted in
-            if targeted { model.select(.shelf) }
+            if targeted, settings.showsShelfTab { model.select(.shelf) }
         }
     }
 
@@ -35,18 +39,28 @@ struct ExpandedView: View {
     private var pageContent: some View {
         switch model.visiblePage {
         case .player:
-            HStack(alignment: .top, spacing: 28) {
-                Group {
-                    if let track = media.track {
-                        NowPlayingView(model: model, track: track)
-                    } else {
-                        idle
+            if settings.showMusic {
+                HStack(alignment: .top, spacing: 28) {
+                    Group {
+                        if let track = media.track {
+                            NowPlayingView(model: model, track: track)
+                        } else {
+                            idle.slideIn(0)
+                        }
+                    }
+                    .frame(width: 400)
+                    if model.showsCalendar {
+                        CalendarPanel(model: model, width: 200)
+                            .slideIn(4)
                     }
                 }
-                .frame(width: 400)
-                if model.showsCalendar {
-                    CalendarPanel(model: model, width: 200)
-                }
+            } else if model.showsCalendar {
+                // Without music the calendar takes the whole tab.
+                CalendarPanel(model: model, width: model.openWidth - 60,
+                              expanded: settings.expandedCalendarStyle == .month)
+                    .slideIn(0)
+            } else {
+                HomeView(model: model)
             }
         case .shelf:
             ShelfView(model: model, isDropTargeted: isDropTargeted)
@@ -159,7 +173,6 @@ private struct TabSwitcher: View {
                 }
                 .buttonStyle(.plain)
                 .accessibilityLabel(page.title)
-                .animation(.easeOut(duration: 0.15), value: isSelected)
             }
         }
         .padding(glass ? 0 : 2)

@@ -11,18 +11,23 @@ struct ShelfView: View {
 
     var body: some View {
         HStack(spacing: 12) {
-            dropZone
-            .contextMenu {
-                if !shelf.items.isEmpty {
-                    Button("AirDrop All") { shelf.airDrop(shelf.items) }
-                    Button("Show All in Finder") { shelf.revealInFinder(shelf.items) }
-                    Divider()
-                    Button("Clear Shelf") { shelf.removeAll() }
-                }
+            if model.settings.showFileShelf {
+                dropZone
+                    .contextMenu {
+                        if !shelf.items.isEmpty {
+                            Button("AirDrop All") { shelf.airDrop(shelf.items) }
+                            Button("Show All in Finder") { shelf.revealInFinder(shelf.items) }
+                            Divider()
+                            Button("Clear Shelf") { shelf.removeAll() }
+                        }
+                    }
+                    .slideIn(0)
             }
 
             if model.settings.showAirDrop {
-                AirDropTarget(shelf: shelf, glass: glass)
+                // Without the file shelf, AirDrop stretches across the tab.
+                AirDropTarget(shelf: shelf, glass: glass, stretched: !model.settings.showFileShelf)
+                    .slideIn(1)
             }
         }
         .animation(.easeOut(duration: 0.15), value: isDropTargeted)
@@ -123,6 +128,7 @@ private struct ShelfItemView: View {
 private struct AirDropTarget: View {
     let shelf: ShelfStore
     let glass: Bool
+    var stretched = false
     @State private var isTargeted = false
     @State private var isHovered = false
 
@@ -140,7 +146,8 @@ private struct AirDropTarget: View {
                         .background(shape.fill(.white.opacity(isTargeted ? 0.14 : isHovered ? 0.09 : 0.06)))
                 }
             }
-            .frame(width: 104)
+            .frame(width: stretched ? nil : 104)
+            .frame(maxWidth: stretched ? .infinity : nil)
             .contentShape(shape)
         }
         .buttonStyle(.plain)
