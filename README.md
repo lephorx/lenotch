@@ -40,7 +40,8 @@ The DMG opens with a compact drag-to-Applications window with a curved arrow.
 The artwork is stored inside the app bundle so Finder shows no installer support
 files, and the build checks that the universal image stays below 4 MB.
 
-Sparkle 2 checks the latest GitHub Release for updates. Choose **Check for Updates…**
+Sparkle 2 checks the public [Lenotch updates](https://github.com/lephorx/lenotch-updates)
+feed for updates while the app source stays private. Choose **Check for Updates…**
 from the menu bar icon to check manually, or enable automatic checks in General
 settings. Sparkle asks about background checks on the second launch.
 
@@ -51,12 +52,14 @@ GitHub Actions ([build-dmg.yml](.github/workflows/build-dmg.yml)) builds a unive
 (download it from the run's artifacts). Pushing a version tag publishes the DMG,
 its SHA-256 checksum, and a signed `appcast.xml` as a GitHub Release. Release
 builds require the `SPARKLE_PRIVATE_KEY` Actions secret containing the private
-key for the public key in `Resources/Info.plist`. The corresponding private key
-is stored locally in Keychain under the `com.lephorx.Lenotch` Sparkle account.
+key for the public key in `Resources/Info.plist`, and the repository-scoped
+`LENOTCH_UPDATES_DEPLOY_KEY` secret to publish the DMG and appcast to the public
+updates repository. The Sparkle private key is stored locally in Keychain under
+the `com.lephorx.Lenotch` account.
 Tag the commit on `main` after merging `dev`:
 
 ```bash
-git tag v2.2 origin/main && git push origin v2.2
+git tag v2.3 origin/main && git push origin v2.3
 ```
 
 The app is ad-hoc signed, not notarized, so macOS blocks the first launch. Open it with
