@@ -25,6 +25,9 @@ jobs:
           xcodebuild -version
           swift --version
 
+      - name: Install DMG builder
+        run: brew install create-dmg
+
       - name: Build universal DMG
         env:
           ARCHS: arm64 x86_64

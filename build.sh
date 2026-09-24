@@ -58,13 +58,27 @@ case "${1:-}" in
     echo "Installed to /Applications"
     ;;
   dmg)
+    if ! command -v create-dmg >/dev/null 2>&1; then
+      echo "create-dmg is required to package the installer (brew install create-dmg)" >&2
+      exit 1
+    fi
     DMG="build/Lenotch.dmg"
     STAGE="$(mktemp -d)"
     trap 'rm -rf "$STAGE"' EXIT
     cp -R "$APP" "$STAGE/"
-    ln -s /Applications "$STAGE/Applications"
     rm -f "$DMG"
-    hdiutil create -volname Lenotch -srcfolder "$STAGE" -fs HFS+ -format UDZO -ov "$DMG" >/dev/null
+    create-dmg \
+      --volname "Lenotch Installer" \
+      --volicon "Resources/AppIcon.icns" \
+      --background "Resources/dmg-background.png" \
+      --window-pos 160 120 \
+      --window-size 760 465 \
+      --text-size 12 \
+      --icon-size 96 \
+      --icon "Lenotch.app" 190 235 \
+      --hide-extension "Lenotch.app" \
+      --app-drop-link 570 235 \
+      "$DMG" "$STAGE"
     echo "Built $DMG"
     ;;
 esac

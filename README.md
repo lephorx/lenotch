@@ -27,13 +27,17 @@ Ideas that aren't built yet are listed in [IDEAS.md](IDEAS.md).
 
 ## Build & run
 
-Requires macOS 14+ and Xcode / Swift 6 toolchain.
+Requires macOS 14+ and Xcode / Swift 6 toolchain. Building the installer DMG also
+requires `create-dmg` (`brew install create-dmg`).
 
 ```bash
 ./build.sh run       # build build/Lenotch.app and launch it
 ./build.sh install   # copy to /Applications and launch
 ./build.sh dmg       # package build/Lenotch.dmg (ARCHS="arm64 x86_64" for a universal build)
 ```
+
+The DMG opens with a branded drag-to-Applications installation window. Its background
+is generated from [make_dmg_background.swift](scripts/make_dmg_background.swift).
 
 ## Releases
 
