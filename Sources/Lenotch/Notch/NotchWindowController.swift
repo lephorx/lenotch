@@ -235,7 +235,7 @@ final class NotchWindowController {
                 return
             }
 
-            if event.type == .leftMouseDragged, isDraggingContent, settings.openShelfOnDrag {
+            if event.type == .leftMouseDragged, isDraggingContent, settings.openShelfOnDrag, settings.showsShelfTab {
                 cancelPending()
                 model.selectedPage = .shelf
                 setState(.open)

@@ -129,7 +129,7 @@ private struct GeneralSettings: View {
                 Toggle("Music player", isOn: $settings.showMusic)
                 permissions.toggle("Calendar next to the music", isEnabled: $settings.showCalendar, calendar: .events)
                 permissions.cameraToggle("Camera mirror button", isEnabled: $settings.showMirror)
-                Toggle("AirDrop on the shelf", isOn: $settings.showAirDrop)
+                ShelfTabToggle(settings: settings)
             } header: {
                 Text("Features")
             } footer: {
@@ -362,6 +362,15 @@ private struct ShelfSettings: View {
                     .font(.callout)
                     .foregroundStyle(.secondary)
             }
+            Section {
+                ShelfTabToggle(settings: settings)
+                Toggle("File shelf", isOn: $settings.showFileShelf)
+                Toggle("AirDrop", isOn: $settings.showAirDrop)
+            } header: {
+                Text("Shelf tab")
+            } footer: {
+                Text("Without the file shelf, AirDrop fills the tab. With both off, the shelf tab is hidden.")
+            }
             Section("Behaviour") {
                 Toggle("Open the shelf when dragging files onto the notch", isOn: $settings.openShelfOnDrag)
                 Toggle("Keep files on the shelf after restarting", isOn: $settings.keepShelfItems)
@@ -375,5 +384,16 @@ private struct ShelfSettings: View {
             }
         }
         .formStyle(.grouped)
+    }
+}
+
+/// The shelf tab's switch: off and disabled when neither the file shelf nor AirDrop is on.
+private struct ShelfTabToggle: View {
+    @Bindable var settings: AppSettings
+
+    var body: some View {
+        Toggle("Shelf tab", isOn: Binding(get: { settings.showsShelfTab },
+                                          set: { settings.showShelfTab = $0 }))
+            .disabled(!settings.hasShelfContent)
     }
 }

@@ -135,6 +135,15 @@ final class AppSettings {
     var keepShelfItems: Bool { didSet { save(keepShelfItems, "keepShelfItems") } }
     var openShelfOnDrag: Bool { didSet { save(openShelfOnDrag, "openShelfOnDrag") } }
     var showAirDrop: Bool { didSet { save(showAirDrop, "showAirDrop") } }
+    /// The whole shelf tab.
+    var showShelfTab: Bool { didSet { save(showShelfTab, "showShelfTab") } }
+    /// The "Drop files here" shelf inside the tab; without it AirDrop fills the tab.
+    var showFileShelf: Bool { didSet { save(showFileShelf, "showFileShelf") } }
+
+    /// The shelf tab has something to show (the file shelf or AirDrop).
+    var hasShelfContent: Bool { showFileShelf || showAirDrop }
+    /// The shelf tab is in the notch: switched on and not empty.
+    var showsShelfTab: Bool { showShelfTab && hasShelfContent }
 
     init(defaults: UserDefaults = .standard) {
         self.defaults = defaults
@@ -191,6 +200,8 @@ final class AppSettings {
         keepShelfItems = bool("keepShelfItems", true)
         openShelfOnDrag = bool("openShelfOnDrag", true)
         showAirDrop = bool("showAirDrop", true)
+        showShelfTab = bool("showShelfTab", true)
+        showFileShelf = bool("showFileShelf", true)
         reloadProviderConfigs()
     }
 

@@ -23,12 +23,15 @@ struct ExpandedView: View {
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
                 .clipped()
         }
+        // Files dropped on the notch go on the shelf when the file shelf is on.
         .onDrop(of: [.fileURL], isTargeted: $isDropTargeted) { providers in
+            guard settings.showsShelfTab, settings.showFileShelf else { return false }
             ShelfStore.loadURLs(from: providers) { model.shelf.add($0) }
             return true
         }
+        // Dragging files over the notch opens the shelf tab (also for AirDrop alone).
         .onChange(of: isDropTargeted) { _, targeted in
-            if targeted { model.select(.shelf) }
+            if targeted, settings.showsShelfTab { model.select(.shelf) }
         }
     }
 

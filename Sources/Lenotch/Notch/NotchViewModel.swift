@@ -114,7 +114,13 @@ final class NotchViewModel {
 
     /// Tabs shown in the notch; AI Usage only once it's switched on in Settings.
     var pages: [NotchPage] {
-        NotchPage.allCases.filter { $0 != .aiUsage || settings.aiUsageEnabled }
+        NotchPage.allCases.filter { page in
+            switch page {
+            case .player: true
+            case .shelf: settings.showsShelfTab
+            case .aiUsage: settings.aiUsageEnabled
+            }
+        }
     }
 
     /// The selected tab, falling back to the player when it's been switched off.
@@ -140,7 +146,8 @@ final class NotchViewModel {
             case (false, false): return geometry.openSize(contentWidth: 540, bodyHeight: 150)
             }
         case .shelf:
-            return geometry.openSize(contentWidth: 500, bodyHeight: 150)
+            // AirDrop alone is a smaller tab, stretched across it.
+            return geometry.openSize(contentWidth: settings.showFileShelf ? 500 : 380, bodyHeight: 150)
         case .aiUsage:
             // Rings: 8 per row at most, two rows at most.
             let count = min(max(visibleUsageCount, 1), 16)
