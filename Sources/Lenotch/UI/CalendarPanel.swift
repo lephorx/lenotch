@@ -34,7 +34,10 @@ struct CalendarPanel: View {
         }
         .onChange(of: model.settings.hiddenCalendarIDs) { _, _ in calendar.refresh() }
         .onChange(of: model.settings.hiddenReminderListIDs) { _, _ in calendar.refresh() }
-        .onDisappear { model.isOverHorizontalScroller = false }
+        .onDisappear {
+            model.isOverHorizontalScroller = false
+            model.isOverVerticalScroller = false
+        }
     }
 
     /// Reminders only when switched on in Settings (they also need permission to load).
@@ -95,6 +98,7 @@ struct CalendarPanel: View {
                             }
                         }
                     }
+                    .onHover { model.isOverVerticalScroller = $0 }
                     .onAppear { scrollToNextEvent(proxy: proxy) }
                     .onChange(of: calendar.events.map(\.id)) { _, _ in scrollToNextEvent(proxy: proxy) }
                     .onChange(of: model.settings.autoScrollCalendar) { _, enabled in

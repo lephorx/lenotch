@@ -59,6 +59,9 @@ final class NotchViewModel {
     /// Pointer is over a sideways-scrolling area (the calendar's day strip), where
     /// two-finger swipes scroll instead of switching tabs.
     var isOverHorizontalScroller = false
+    /// Pointer is over a vertically scrolling list (the calendar's events), where
+    /// swiping up scrolls instead of closing the notch.
+    var isOverVerticalScroller = false
     /// The camera popup beside the notch; closes with the notch or on a second click.
     var isMirrorVisible = false
     let openSettings: () -> Void

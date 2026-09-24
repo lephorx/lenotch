@@ -28,6 +28,10 @@ final class NotchWindowController {
     private static let swipeThreshold: CGFloat = 60
 
     private var swipeDistance: CGFloat = 0
+    private var verticalSwipeDistance: CGFloat = 0
+    /// After a swipe closes the notch, hovering doesn't reopen it until the pointer
+    /// has left the notch once.
+    private var hoverOpenBlocked = false
     private var swipeHandled = false
     private var lastScroll = Date.distantPast
 
@@ -122,27 +126,47 @@ final class NotchWindowController {
 
     /// Two-finger horizontal swipes (trackpad or Magic Mouse) switch tabs, once per gesture.
     /// Returns nil when the event was used for a swipe.
+    /// Two-finger swipes on the open notch: sideways switches tabs, up closes it.
     private func handleSwipe(_ event: NSEvent) -> NSEvent? {
-        guard model.state == .open, model.pages.count > 1,
-              !model.isOverHorizontalScroller else { return event }
+        guard model.state == .open else { return event }
         #if DEBUG
         if debugHoldOpen { return event }
         #endif
-        // A full shelf scrolls sideways instead (about five files fit without scrolling).
-        if model.visiblePage == .shelf, model.shelf.items.count > 5 { return event }
+        // Sideways swipes scroll the calendar's day strip and a full shelf instead
+        // (about five files fit without scrolling); vertical ones scroll the event list.
+        let canSwitchTabs = model.pages.count > 1 && !model.isOverHorizontalScroller
+            && !(model.visiblePage == .shelf && model.shelf.items.count > 5)
+        let canClose = !model.isOverVerticalScroller
         // Ignore the inertia that keeps scrolling after the fingers lift.
         guard event.momentumPhase.isEmpty else { return swipeHandled ? nil : event }
 
         let now = Date()
         if event.phase.contains(.began) || (event.phase.isEmpty && now.timeIntervalSince(lastScroll) > 0.35) {
             swipeDistance = 0
+            verticalSwipeDistance = 0
             swipeHandled = false
         }
         lastScroll = now
 
+        // Normalise to finger movement regardless of the natural scrolling setting
+        // (right and up are positive).
+        let inverted = event.isDirectionInvertedFromDevice
         if abs(event.scrollingDeltaX) > abs(event.scrollingDeltaY) {
-            // Normalise to finger movement regardless of the natural scrolling setting.
-            swipeDistance += event.isDirectionInvertedFromDevice ? event.scrollingDeltaX : -event.scrollingDeltaX
+            guard canSwitchTabs else { return event }
+            swipeDistance += inverted ? event.scrollingDeltaX : -event.scrollingDeltaX
+        } else {
+            guard canClose else { return event }
+            verticalSwipeDistance += inverted ? -event.scrollingDeltaY : event.scrollingDeltaY
+        }
+
+        if !swipeHandled, verticalSwipeDistance > Self.swipeThreshold {
+            swipeHandled = true
+            // Fingers moving up close the notch, like flicking it back into the menu bar.
+            cancelPending()
+            setState(.closed)
+            hoverOpenBlocked = true
+            NSHapticFeedbackManager.defaultPerformer.perform(.generic, performanceTime: .now)
+            return nil
         }
 
         if !swipeHandled, abs(swipeDistance) > Self.swipeThreshold {
@@ -207,6 +231,7 @@ final class NotchWindowController {
             let hotZone = geometry.rect(for: model.currentSize).insetBy(dx: -6, dy: -2)
             guard hotZone.contains(location) else {
                 cancelPending()
+                hoverOpenBlocked = false
                 return
             }
 
@@ -216,7 +241,7 @@ final class NotchWindowController {
                 setState(.open)
             } else if settings.openMode == .click {
                 if event.type == .leftMouseDown { setState(.open) }
-            } else if event.type == .mouseMoved {
+            } else if event.type == .mouseMoved, !hoverOpenBlocked {
                 schedule(after: settings.hoverDelay) { [weak self] in self?.setState(.open) }
             }
 
