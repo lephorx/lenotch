@@ -9,7 +9,7 @@ on run argv
                 set bounds to {160, 120, 760, 460}
             end tell
             tell icon view options of container window
-                set background color to {52736, 56576, 62464}
+                set background picture to (POSIX file ((item 2 of argv) & "/Lenotch.app/Contents/Resources/installer-background.png") as alias)
             end tell
             close
             open

@@ -27,6 +27,9 @@ cp "$BIN_DIR/Lenotch" "$APP/Contents/MacOS/"
 cp Resources/Info.plist "$APP/Contents/"
 cp -R Vendor/MediaRemoteAdapter "$APP/Contents/Resources/"
 cp Resources/logo-white.png Resources/AppIcon.icns Resources/glyph-amp.svg "$APP/Contents/Resources/"
+if [ "${1:-}" = dmg ]; then
+  cp Resources/installer-background.png "$APP/Contents/Resources/"
+fi
 if [ -n "${VERSION:-}" ]; then
   /usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString $VERSION" "$APP/Contents/Info.plist"
 fi
@@ -80,7 +83,7 @@ case "${1:-}" in
       --skip-finalize \
       "$DMG" "$STAGE"
     hdiutil attach -readwrite -nobrowse -mountpoint "$MOUNT" "$DMG" -quiet
-    osascript scripts/style_dmg.applescript "$(basename "$MOUNT")"
+    osascript scripts/style_dmg.applescript "$(basename "$MOUNT")" "$MOUNT"
     hdiutil detach "$MOUNT" -quiet
     rm -f "${DMG%.dmg}-compressed.dmg"
     hdiutil convert "$DMG" -format UDZO -o "${DMG%.dmg}-compressed.dmg" -quiet
