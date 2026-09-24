@@ -24,15 +24,28 @@ BIN_DIR="$(swift build -c "$CONFIG" ${ARCH_FLAGS[@]+"${ARCH_FLAGS[@]}"} --show-b
 rm -rf "$APP"
 mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
 cp "$BIN_DIR/Lenotch" "$APP/Contents/MacOS/"
+install_name_tool -add_rpath @executable_path/../Frameworks "$APP/Contents/MacOS/Lenotch"
 cp Resources/Info.plist "$APP/Contents/"
 cp -R Vendor/MediaRemoteAdapter "$APP/Contents/Resources/"
 cp Resources/logo-white.png Resources/AppIcon.icns Resources/glyph-amp.svg "$APP/Contents/Resources/"
+if [ "${1:-}" = dmg ]; then
+  cp Resources/installer-background.png "$APP/Contents/Resources/"
+fi
 if [ -n "${VERSION:-}" ]; then
   /usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString $VERSION" "$APP/Contents/Info.plist"
 fi
 if [ -n "${BUILD:-}" ]; then
   /usr/libexec/PlistBuddy -c "Set :CFBundleVersion $BUILD" "$APP/Contents/Info.plist"
 fi
+SPARKLE_SOURCE=".build/artifacts/sparkle/Sparkle/Sparkle.xcframework/macos-arm64_x86_64/Sparkle.framework"
+SPARKLE_DEST="$APP/Contents/Frameworks/Sparkle.framework"
+mkdir -p "$APP/Contents/Frameworks"
+ditto "$SPARKLE_SOURCE" "$SPARKLE_DEST"
+# Lenotch is not sandboxed, so Sparkle's XPC services are unnecessary.
+rm -rf "$SPARKLE_DEST/Versions/B/XPCServices" "$SPARKLE_DEST/XPCServices"
+codesign --force --sign - "$SPARKLE_DEST/Versions/B/Autoupdate"
+codesign --force --sign - "$SPARKLE_DEST/Versions/B/Updater.app"
+codesign --force --sign - "$SPARKLE_DEST"
 codesign --force --sign - "$APP"
 
 echo "Built $APP"
@@ -64,21 +77,43 @@ case "${1:-}" in
     fi
     DMG="build/Lenotch.dmg"
     STAGE="$(mktemp -d)"
-    trap 'rm -rf "$STAGE"' EXIT
+    MOUNT="$(mktemp -d)"
+    trap 'hdiutil detach "$MOUNT" -quiet 2>/dev/null || true; rm -rf "$STAGE" "$MOUNT"' EXIT
     cp -R "$APP" "$STAGE/"
     rm -f "$DMG"
     create-dmg \
       --volname "Lenotch Installer" \
-      --volicon "Resources/AppIcon.icns" \
-      --background "Resources/dmg-background.png" \
       --window-pos 160 120 \
-      --window-size 760 465 \
-      --text-size 12 \
-      --icon-size 96 \
-      --icon "Lenotch.app" 190 235 \
+      --window-size 600 340 \
+      --text-size 14 \
+      --icon-size 112 \
+      --icon "Lenotch.app" 155 165 \
       --hide-extension "Lenotch.app" \
-      --app-drop-link 570 235 \
+      --app-drop-link 445 165 \
+      --skip-finalize \
       "$DMG" "$STAGE"
+    hdiutil attach -readwrite -nobrowse -mountpoint "$MOUNT" "$DMG" -quiet
+    STYLED=0
+    for attempt in 1 2 3 4 5; do
+      if osascript scripts/style_dmg.applescript "$(basename "$MOUNT")" "$MOUNT"; then
+        STYLED=1
+        break
+      fi
+      sleep 2
+    done
+    if [ "$STYLED" -ne 1 ]; then
+      echo "Finder could not style the installer window" >&2
+      exit 1
+    fi
+    hdiutil detach "$MOUNT" -quiet
+    rm -f "${DMG%.dmg}-compressed.dmg"
+    hdiutil convert "$DMG" -format UDBZ -o "${DMG%.dmg}-compressed.dmg" -quiet
+    mv "${DMG%.dmg}-compressed.dmg" "$DMG"
+    DMG_BYTES="$(stat -f '%z' "$DMG")"
+    if [ "$DMG_BYTES" -ge 4000000 ]; then
+      echo "Installer exceeds 4 MB: $DMG_BYTES bytes" >&2
+      exit 1
+    fi
     echo "Built $DMG"
     ;;
 esac

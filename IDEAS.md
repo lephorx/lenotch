@@ -30,5 +30,4 @@ Features that aren't built yet, roughly ordered by effort. Every new feature sho
 ## Polish
 
 - **Auto-hide:** hide the notch in full-screen video, games or while screen sharing.
-- **Auto-update** with Sparkle.
 - **Signing:** a Developer ID signed and notarized build, so macOS keeps its permissions between builds.

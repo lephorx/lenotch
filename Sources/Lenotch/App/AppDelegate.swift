@@ -1,6 +1,12 @@
 import AppKit
+import Sparkle
 
 final class AppDelegate: NSObject, NSApplicationDelegate {
+    private let updaterController = SPUStandardUpdaterController(startingUpdater: true,
+                                                                  updaterDelegate: nil,
+                                                                  userDriverDelegate: nil)
+    var updater: SPUUpdater { updaterController.updater }
+    func checkForUpdates() { updaterController.checkForUpdates(nil) }
     let settings = AppSettings()
     private lazy var media = NowPlayingService(source: settings.audioSource)
     private let battery = BatteryMonitor()
@@ -74,6 +80,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     func showSettings() {
         windows.show(id: "settings", title: "Lenotch Settings") {
             SettingsView(settings: settings, shelf: shelf, permissions: permissions,
+                         updater: updater,
                          showOnboarding: { [weak self] in self?.showOnboarding() },
                          playIntro: { [weak self] in self?.playIntro() })
         }

@@ -36,18 +36,27 @@ requires `create-dmg` (`brew install create-dmg`).
 ./build.sh dmg       # package build/Lenotch.dmg (ARCHS="arm64 x86_64" for a universal build)
 ```
 
-The DMG opens with a branded drag-to-Applications installation window. Its background
-is generated from [make_dmg_background.swift](scripts/make_dmg_background.swift).
+The DMG opens with a compact drag-to-Applications window with a curved arrow.
+The artwork is stored inside the app bundle so Finder shows no installer support
+files, and the build checks that the universal image stays below 4 MB.
+
+Sparkle 2 checks the latest GitHub Release for updates. Choose **Check for Updates…**
+from the menu bar icon to check manually, or enable automatic checks in General
+settings. Sparkle asks about background checks on the second launch.
 
 ## Releases
 
 GitHub Actions ([build-dmg.yml](.github/workflows/build-dmg.yml)) builds a universal
 `Lenotch.dmg` on pushes to `main`, `dev` or `lenotch-rewrite`, and on pull requests
-(download it from the run's artifacts). Pushing a version tag publishes the DMG and
-its SHA-256 checksum as a GitHub Release:
+(download it from the run's artifacts). Pushing a version tag publishes the DMG,
+its SHA-256 checksum, and a signed `appcast.xml` as a GitHub Release. Release
+builds require the `SPARKLE_PRIVATE_KEY` Actions secret containing the private
+key for the public key in `Resources/Info.plist`. The corresponding private key
+is stored locally in Keychain under the `com.lephorx.Lenotch` Sparkle account.
+Tag the commit on `main` after merging `dev`:
 
 ```bash
-git tag v2.1 && git push origin v2.1
+git tag v2.2 origin/main && git push origin v2.2
 ```
 
 The app is ad-hoc signed, not notarized, so macOS blocks the first launch. Open it with

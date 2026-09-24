@@ -1,4 +1,5 @@
 import ServiceManagement
+import Sparkle
 import SwiftUI
 
 /// Settings sections, listed in the sidebar.
@@ -49,6 +50,7 @@ struct SettingsView: View {
     @Bindable var settings: AppSettings
     let shelf: ShelfStore
     let permissions: PermissionCenter
+    let updater: SPUUpdater
     let showOnboarding: () -> Void
     let playIntro: () -> Void
 
@@ -80,7 +82,8 @@ struct SettingsView: View {
     private var detail: some View {
         switch section ?? .general {
         case .general:
-            GeneralSettings(settings: settings, showOnboarding: showOnboarding, playIntro: playIntro)
+            GeneralSettings(settings: settings, updater: updater,
+                            showOnboarding: showOnboarding, playIntro: playIntro)
         case .appearance:
             AppearanceSettings(settings: settings)
         case .media:
@@ -108,6 +111,7 @@ struct SettingsView: View {
 
 private struct GeneralSettings: View {
     @Bindable var settings: AppSettings
+    let updater: SPUUpdater
     let showOnboarding: () -> Void
     let playIntro: () -> Void
 
@@ -158,6 +162,10 @@ private struct GeneralSettings: View {
             }
             Section("App") {
                 Toggle("Launch at login", isOn: $launchAtLogin)
+                Toggle("Check for updates automatically", isOn: Binding(
+                    get: { updater.automaticallyChecksForUpdates },
+                    set: { updater.automaticallyChecksForUpdates = $0 }
+                ))
                 LabeledContent("Welcome screen") {
                     Button("Show Again…", action: showOnboarding)
                 }

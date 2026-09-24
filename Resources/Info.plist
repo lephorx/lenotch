@@ -26,6 +26,10 @@
 	<string>14.0</string>
 	<key>LSUIElement</key>
 	<true/>
+	<key>SUFeedURL</key>
+	<string>https://github.com/lephorx/lenotch/releases/latest/download/appcast.xml</string>
+	<key>SUPublicEDKey</key>
+	<string>zDhGeF8+LfLp027ZzYarC44+eo/Y9Vl80DEHv1oEjEQ=</string>
 	<key>NSAppleEventsUsageDescription</key>
 	<string>Lenotch reads what Spotify or Music is playing and controls playback from the notch.</string>
 	<key>NSAudioCaptureUsageDescription</key>
