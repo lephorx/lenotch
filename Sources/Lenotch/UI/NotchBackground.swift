@@ -64,7 +64,7 @@ private struct GlassFill: View {
     let shape: NotchShape
 
     var body: some View {
-        Color.clear.notchGlass(true, in: shape)
+        Color.clear.notchGlass(true, in: shape).allowsHitTesting(false)
     }
 }
 
@@ -86,5 +86,8 @@ struct NotchGradientSlice: View {
                 .frame(width: proxy.size.width, height: notchHeight)
                 .offset(y: -frame.minY)
         }
+        // The gradient spans the whole notch height (only a slice shows), so it must not
+        // take clicks: it used to swallow clicks on the progress bar above the pill.
+        .allowsHitTesting(false)
     }
 }

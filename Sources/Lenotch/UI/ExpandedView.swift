@@ -161,7 +161,7 @@ private struct TabSwitcher: View {
                         if isSelected {
                             Group {
                                 if glass {
-                                    Color.clear.notchGlass(true, in: Capsule())
+                                    Color.clear.notchGlass(true, in: Capsule()).allowsHitTesting(false)
                                 } else {
                                     Capsule().fill(.white.opacity(0.18))
                                 }
