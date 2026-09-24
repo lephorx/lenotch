@@ -37,8 +37,9 @@ Requires macOS 14+ and Xcode / Swift 6 toolchain.
 ## Releases
 
 GitHub Actions ([build-dmg.yml](.github/workflows/build-dmg.yml)) builds a universal
-`Lenotch.dmg` on every push to `main` and every pull request (download it from the run's
-artifacts). Pushing a version tag publishes it as a GitHub Release:
+`Lenotch.dmg` on pushes to `main` or `lenotch-rewrite`, and on pull requests
+(download it from the run's artifacts). Pushing a version tag publishes the DMG and
+its SHA-256 checksum as a GitHub Release:
 
 ```bash
 git tag v2.1 && git push origin v2.1
