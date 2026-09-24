@@ -167,6 +167,13 @@ private struct GeneralSettings: View {
             } footer: {
                 Text("Work in any app. Peek shows the song and artist under the notch for a few seconds, and does nothing when nothing is playing.")
             }
+            Section {
+                Toggle("Show icon in the menu bar", isOn: $settings.showMenuBarIcon)
+            } header: {
+                Text("Menu bar")
+            } footer: {
+                Text("When hidden, open Settings with the gear in the notch, or by opening Lenotch again from Applications or Spotlight.")
+            }
             Section("App") {
                 Toggle("Launch at login", isOn: $launchAtLogin)
                 Toggle("Check for updates automatically", isOn: Binding(

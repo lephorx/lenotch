@@ -26,6 +26,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private let windows = WindowPresenter()
     private var notch: NotchWindowController?
 
+    /// Opening Lenotch again (Finder, Spotlight) shows Settings — the way back
+    /// when the menu bar icon is hidden.
+    func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
+        showSettings()
+        return false
+    }
+
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSApp.setActivationPolicy(.accessory)
         settings.onAudioSourceChange = { [weak self] source in self?.media.setSource(source) }

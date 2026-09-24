@@ -58,6 +58,9 @@ final class AppSettings {
     /// Seconds the pointer has to rest on the notch before it opens in hover mode.
     var hoverDelay: Double { didSet { save(hoverDelay, "hoverDelay") } }
     var showBatteryPercentage: Bool { didSet { save(showBatteryPercentage, "showBatteryPercentage") } }
+    /// The Lenotch icon in the menu bar. When hidden, Settings is reached from the
+    /// notch's gear or by opening the app again.
+    var showMenuBarIcon: Bool { didSet { save(showMenuBarIcon, "showMenuBarIcon") } }
     /// Show the calendar next to the music (it also needs calendar permission).
     var showCalendar: Bool { didSet { save(showCalendar, "showCalendar") } }
     /// Reminders under the day's events (also needs reminders permission).
@@ -143,6 +146,7 @@ final class AppSettings {
         peekShortcut = shortcut("peekShortcut", .peekDefault)
         hoverDelay = defaults.object(forKey: "hoverDelay") as? Double ?? 0.12
         showBatteryPercentage = bool("showBatteryPercentage", true)
+        showMenuBarIcon = bool("showMenuBarIcon", true)
         showCalendar = bool("showCalendar", true)
         showReminders = bool("showReminders", true)
         showMirror = bool("showMirror", true)

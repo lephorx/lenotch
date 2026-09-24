@@ -5,7 +5,7 @@ struct LenotchApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
 
     var body: some Scene {
-        MenuBarExtra {
+        MenuBarExtra(isInserted: Bindable(appDelegate.settings).showMenuBarIcon) {
             MenuContent(settings: appDelegate.settings, showSettings: appDelegate.showSettings,
                         checkForUpdates: appDelegate.checkForUpdates)
         } label: {
@@ -27,6 +27,7 @@ private struct MenuContent: View {
             .keyboardShortcut(",")
         Button("Check for Updates…", action: checkForUpdates)
         Divider()
+        Button("Hide Menu Bar Icon") { settings.showMenuBarIcon = false }
         Button("Quit Lenotch") { NSApp.terminate(nil) }
             .keyboardShortcut("q")
     }
