@@ -40,8 +40,14 @@ struct ProgressBar: View {
             .frame(height: height)
             .frame(maxHeight: .infinity)
             .contentShape(Rectangle())
+            // A click jumps straight to that point…
+            .onTapGesture(coordinateSpace: .local) { location in
+                guard duration > 0 else { return }
+                model.media.seek(to: min(max(location.x / proxy.size.width, 0), 1) * duration)
+            }
+            // …and dragging scrubs.
             .gesture(
-                DragGesture(minimumDistance: 0)
+                DragGesture(minimumDistance: 3)
                     .onChanged { value in
                         guard duration > 0 else { return }
                         model.isInteracting = true
@@ -55,7 +61,7 @@ struct ProgressBar: View {
             )
             .animation(.spring(response: 0.25, dampingFraction: 0.8), value: isDragging)
         }
-        .frame(height: 12)
+        .frame(height: 18)
     }
 
     private static func format(_ seconds: Double) -> String {

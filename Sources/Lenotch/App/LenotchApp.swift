@@ -5,8 +5,11 @@ struct LenotchApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
 
     var body: some Scene {
-        MenuBarExtra("Lenotch", systemImage: "rectangle.topthird.inset.filled") {
+        MenuBarExtra {
             MenuContent(settings: appDelegate.settings, showSettings: appDelegate.showSettings)
+        } label: {
+            Image(nsImage: LogoShape.menuBarImage())
+                .accessibilityLabel("Lenotch")
         }
     }
 }

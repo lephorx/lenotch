@@ -1,9 +1,28 @@
 import AppKit
+import AVFoundation
+import EventKit
 import SwiftUI
 import Observation
 
-enum NotchTab: Hashable {
-    case nowPlaying, shelf
+/// The three fixed views in the open notch.
+enum NotchPage: Int, CaseIterable, Identifiable {
+    case player, shelf, aiUsage
+
+    var id: Int { rawValue }
+    var title: String {
+        switch self {
+        case .player: "Now Playing"
+        case .shelf: "Shelf"
+        case .aiUsage: "AI Usage"
+        }
+    }
+    var icon: String {
+        switch self {
+        case .player: "logo"
+        case .shelf: "tray.fill"
+        case .aiUsage: "sparkles"
+        }
+    }
 }
 
 @Observable
@@ -11,7 +30,11 @@ final class NotchViewModel {
     enum State { case closed, open }
 
     var state: State = .closed
-    var selectedTab: NotchTab = .nowPlaying
+    /// The first-launch intro is playing (the notch ignores the pointer meanwhile).
+    var isShowingIntro = false
+    /// Briefly showing the current song under the closed notch.
+    var isPeeking = false
+    var selectedPage: NotchPage = .player
     var geometry: NotchGeometry
     /// Set while the user drags the progress bar so the notch does not close mid-scrub.
     var isInteracting = false
@@ -21,6 +44,20 @@ final class NotchViewModel {
     let shelf: ShelfStore
     let visualizer: AudioVisualizer
     let camera = CameraMirror()
+    let calendar = CalendarService()
+    let aiUsage = AIUsageService()
+    /// The AI usage ring under the pointer, for the bubble below the notch.
+    private(set) var usageHover: UsageHover?
+    @ObservationIgnored var onUsageHoverChange: (() -> Void)?
+
+    func setUsageHover(_ hover: UsageHover?) {
+        guard hover != usageHover else { return }
+        usageHover = hover
+        onUsageHoverChange?()
+    }
+    /// Pointer is over a sideways-scrolling area (the calendar's day strip), where
+    /// two-finger swipes scroll instead of switching tabs.
+    var isOverHorizontalScroller = false
     /// The camera popup beside the notch; closes with the notch or on a second click.
     var isMirrorVisible = false
     let openSettings: () -> Void
@@ -54,7 +91,10 @@ final class NotchViewModel {
     }
 
     func toggleMirror() {
-        withAnimation(.spring(response: 0.45, dampingFraction: 0.82)) { isMirrorVisible.toggle() }
+        onOpenSizeChange?()
+        // No bounce: the popup hangs from the top of the screen, and overshooting
+        // would pull it down far enough to show the gap above it.
+        withAnimation(.smooth(duration: 0.35)) { isMirrorVisible.toggle() }
         // Driven by the toggle, not the popup's appear/disappear, which fire after the
         // animations and could stop the camera of a popup that was quickly reopened.
         if isMirrorVisible {
@@ -64,39 +104,68 @@ final class NotchViewModel {
         }
     }
 
-    /// Tabs turned on in Settings, in display order.
-    var tabs: [NotchTab] {
-        [.nowPlaying] + (settings.shelfEnabled ? [.shelf] : [])
+    // MARK: - Pages
+
+    /// Tabs shown in the notch; AI Usage only once it's switched on in Settings.
+    var pages: [NotchPage] {
+        NotchPage.allCases.filter { $0 != .aiUsage || settings.aiUsageEnabled }
     }
 
-    /// The tab actually shown, falling back when the selected one is turned off.
-    var visibleTab: NotchTab { tabs.contains(selectedTab) ? selectedTab : .nowPlaying }
+    /// The selected tab, falling back to the player when it's been switched off.
+    var visiblePage: NotchPage { pages.contains(selectedPage) ? selectedPage : .player }
 
-    /// Whether the last tab change moved right (for the slide direction).
-    private(set) var tabMovesForward = true
+    // Features that need a permission stay out of the notch until it's allowed.
+    var isCalendarAllowed: Bool { EKEventStore.authorizationStatus(for: .event) == .fullAccess }
+    var isCameraAllowed: Bool { AVCaptureDevice.authorizationStatus(for: .video) == .authorized }
+    var openWidth: CGFloat { openSize(for: visiblePage).width }
 
-    /// Switches tabs with a slide in the matching direction.
-    func select(_ tab: NotchTab) {
-        guard tab != visibleTab, let from = tabs.firstIndex(of: visibleTab),
-              let to = tabs.firstIndex(of: tab) else { return }
-        // Set the direction first so the outgoing tab slides the right way too.
-        tabMovesForward = to > from
-        DispatchQueue.main.async {
-            withAnimation(.spring(response: 0.38, dampingFraction: 0.86)) { self.selectedTab = tab }
+    /// Each tab is only as big as what it shows.
+    func openSize(for page: NotchPage) -> CGSize {
+        switch page {
+        case .player:
+            // Music alone is narrower than music with the calendar beside it.
+            return isCalendarAllowed ? geometry.openSize : geometry.openSize(contentWidth: 460, bodyHeight: 166)
+        case .shelf:
+            return geometry.openSize(contentWidth: 500, bodyHeight: 150)
+        case .aiUsage:
+            // Rings: 8 per row at most, two rows at most.
+            let count = min(max(visibleUsageCount, 1), 16)
+            let perRow = min(count, 8)
+            let rowWidth = CGFloat(perRow) * 52 + CGFloat(perRow - 1) * 26
+            return geometry.openSize(contentWidth: rowWidth + 60, bodyHeight: count > 8 ? 160 : 118)
         }
     }
 
-    /// Moves to the next (+1) or previous (-1) tab; used by swipes.
-    func selectTab(offset: Int) {
-        guard let index = tabs.firstIndex(of: visibleTab) else { return }
-        let target = index + offset
-        guard tabs.indices.contains(target) else { return }
-        select(tabs[target])
+    /// AI usage sources with something to show (tools that aren't set up are hidden).
+    var visibleUsageCount: Int {
+        settings.usageSources.filter { aiUsage.usage[$0.id] != .notSetUp }.count
+    }
+
+    /// Called when the open notch's size changes, so the camera popup can follow its edge.
+    @ObservationIgnored var onOpenSizeChange: (() -> Void)?
+
+    /// Whether the last page change moved right (for the slide direction).
+    private(set) var pageMovesForward = true
+
+    /// Switches pages with a slide in the matching direction.
+    func select(_ page: NotchPage) {
+        guard page != visiblePage else { return }
+        pageMovesForward = page.rawValue > visiblePage.rawValue
+        withAnimation(.spring(response: 0.42, dampingFraction: 0.84)) { selectedPage = page }
+        onOpenSizeChange?()
+    }
+
+    /// Moves to the next (+1) or previous (-1) page; used by swipes.
+    func selectPage(offset: Int) {
+        guard let index = pages.firstIndex(of: visiblePage), pages.indices.contains(index + offset) else { return }
+        select(pages[index + offset])
     }
 
     var currentSize: CGSize {
-        switch state {
-        case .open: geometry.openSize
+        if isShowingIntro { return geometry.introSize }
+        if isPeeking, state == .closed { return geometry.peekSize }
+        return switch state {
+        case .open: openSize(for: visiblePage)
         case .closed: showsLiveActivity ? geometry.liveSize : geometry.closedSize
         }
     }

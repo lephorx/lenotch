@@ -1,9 +1,13 @@
 import SwiftUI
 
-/// First-launch setup: pick an audio source, then an appearance.
+/// First-launch setup: pick an audio source, an appearance, then the permissions
+/// for the features you want (nothing is asked for unless you click Allow).
 struct OnboardingView: View {
     @Bindable var settings: AppSettings
+    let permissions: PermissionCenter
     let finish: () -> Void
+
+    private static let lastStep = 2
 
     @State private var step = 0
 
@@ -11,14 +15,16 @@ struct OnboardingView: View {
         VStack(spacing: 20) {
             header
             Group {
-                if step == 0 {
+                switch step {
+                case 0:
                     SourcePicker(selection: $settings.audioSource)
-                        .transition(.asymmetric(insertion: .move(edge: .leading), removal: .move(edge: .leading))
-                            .combined(with: .opacity))
-                } else {
+                        .transition(.push(from: .trailing).combined(with: .opacity))
+                case 1:
                     AppearancePicker(settings: settings)
-                        .transition(.asymmetric(insertion: .move(edge: .trailing), removal: .move(edge: .trailing))
-                            .combined(with: .opacity))
+                        .transition(.push(from: .trailing).combined(with: .opacity))
+                default:
+                    PermissionsView(permissions: permissions, settings: settings)
+                        .transition(.push(from: .trailing).combined(with: .opacity))
                 }
             }
             .frame(minHeight: 170, alignment: .top)
@@ -42,19 +48,20 @@ struct OnboardingView: View {
                         .padding(.trailing, 16)
                 }
                 .padding(.bottom, 6)
-            Text(step == 0 ? "Welcome to Lenotch" : "Choose a Style")
+            Text(["Welcome to Lenotch", "Choose a Style", "Permissions"][step])
                 .font(.system(size: 22, weight: .bold))
-            Text(step == 0
-                 ? "Which app should the notch show music from?"
-                 : "How should the notch look when it opens?")
+            Text(["Which app should the notch show music from?",
+                  "How should the notch look when it opens?",
+                  "Allow only what you want to use. You can change this any time in Settings."][step])
                 .foregroundStyle(.secondary)
+                .multilineTextAlignment(.center)
         }
     }
 
     private var footer: some View {
         HStack {
             HStack(spacing: 6) {
-                ForEach(0..<2) { index in
+                ForEach(0...Self.lastStep, id: \.self) { index in
                     Circle()
                         .fill(index == step ? Color.primary : Color.primary.opacity(0.2))
                         .frame(width: 6, height: 6)
@@ -65,8 +72,8 @@ struct OnboardingView: View {
                 Button("Back") { step -= 1 }
                     .controlSize(.large)
             }
-            Button(step == 0 ? "Continue" : "Get Started") {
-                if step == 0 { step += 1 } else { finish() }
+            Button(step < Self.lastStep ? "Continue" : "Get Started") {
+                if step < Self.lastStep { step += 1 } else { finish() }
             }
             .keyboardShortcut(.defaultAction)
             .controlSize(.large)

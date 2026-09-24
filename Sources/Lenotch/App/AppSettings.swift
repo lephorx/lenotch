@@ -41,15 +41,22 @@ enum OpenMode: String, CaseIterable, Identifiable {
 final class AppSettings {
     @ObservationIgnored private let defaults: UserDefaults
     @ObservationIgnored var onAudioSourceChange: ((AudioSource) -> Void)?
-
     // MARK: Setup
     var hasCompletedOnboarding: Bool { didSet { save(hasCompletedOnboarding, "hasCompletedOnboarding") } }
+    var hasPlayedIntro: Bool { didSet { save(hasPlayedIntro, "hasPlayedIntro") } }
 
     // MARK: General
     var openMode: OpenMode { didSet { save(openMode.rawValue, "openMode") } }
+    /// Global shortcuts; nil turns one off.
+    var toggleShortcut: KeyShortcut? {
+        didSet { saveShortcut(toggleShortcut, "toggleShortcut"); onShortcutsChange?() }
+    }
+    var peekShortcut: KeyShortcut? {
+        didSet { saveShortcut(peekShortcut, "peekShortcut"); onShortcutsChange?() }
+    }
+    @ObservationIgnored var onShortcutsChange: (() -> Void)?
     /// Seconds the pointer has to rest on the notch before it opens in hover mode.
     var hoverDelay: Double { didSet { save(hoverDelay, "hoverDelay") } }
-    var showBattery: Bool { didSet { save(showBattery, "showBattery") } }
     var showBatteryPercentage: Bool { didSet { save(showBatteryPercentage, "showBatteryPercentage") } }
 
     // MARK: Appearance
@@ -72,14 +79,24 @@ final class AppSettings {
     /// Drive the equalizer bars from the actual system audio.
     var realAudioVisualizer: Bool { didSet { save(realAudioVisualizer, "realAudioVisualizer") } }
 
+    // MARK: AI usage
+    /// Off by default: the AI Usage tab only appears once switched on.
+    var aiUsageEnabled: Bool { didSet { save(aiUsageEnabled, "aiUsageEnabled") } }
+    /// Enabled usage sources in display order: built-in provider names or `custom:<uuid>`.
+    var usageSourceKeys: [String] { didSet { save(usageSourceKeys, "aiProviders") } }
+    var customProviders: [CustomAIProvider] {
+        didSet { defaults.set(try? JSONEncoder().encode(customProviders), forKey: "customProviders") }
+    }
+
+    /// The enabled sources, resolved, in order.
+    var usageSources: [UsageSource] {
+        usageSourceKeys.compactMap { UsageSource.resolve($0, customs: customProviders) }
+    }
+
     // MARK: Shelf
-    var shelfEnabled: Bool { didSet { save(shelfEnabled, "shelfEnabled") } }
     var keepShelfItems: Bool { didSet { save(keepShelfItems, "keepShelfItems") } }
     var openShelfOnDrag: Bool { didSet { save(openShelfOnDrag, "openShelfOnDrag") } }
     var showAirDrop: Bool { didSet { save(showAirDrop, "showAirDrop") } }
-
-    // MARK: Mirror
-    var mirrorEnabled: Bool { didSet { save(mirrorEnabled, "mirrorEnabled") } }
 
     init(defaults: UserDefaults = .standard) {
         self.defaults = defaults
@@ -87,9 +104,16 @@ final class AppSettings {
         func bool(_ key: String, _ fallback: Bool) -> Bool { defaults.object(forKey: key) as? Bool ?? fallback }
 
         hasCompletedOnboarding = bool("hasCompletedOnboarding", false)
+        hasPlayedIntro = bool("hasPlayedIntro", false)
         openMode = defaults.string(forKey: "openMode").flatMap(OpenMode.init) ?? .hover
+        func shortcut(_ key: String, _ fallback: KeyShortcut) -> KeyShortcut? {
+            guard let data = defaults.data(forKey: key) else { return fallback }
+            // An empty value means the user turned the shortcut off.
+            return data.isEmpty ? nil : try? JSONDecoder().decode(KeyShortcut.self, from: data)
+        }
+        toggleShortcut = shortcut("toggleShortcut", .toggleDefault)
+        peekShortcut = shortcut("peekShortcut", .peekDefault)
         hoverDelay = defaults.object(forKey: "hoverDelay") as? Double ?? 0.12
-        showBattery = bool("showBattery", true)
         showBatteryPercentage = bool("showBatteryPercentage", true)
         appearance = defaults.string(forKey: "appearance").flatMap(Appearance.init) ?? .black
         func gradient(_ key: String, _ fallback: NotchGradient) -> NotchGradient {
@@ -103,12 +127,21 @@ final class AppSettings {
         audioSource = defaults.string(forKey: "audioSource").flatMap(AudioSource.init) ?? .nowPlaying
         showShuffleRepeat = bool("showShuffleRepeat", true)
         showFavorite = bool("showFavorite", true)
-        realAudioVisualizer = bool("realAudioVisualizer", true)
-        shelfEnabled = bool("shelfEnabled", true)
+        // Off for new installs until chosen in the setup (it needs audio recording permission).
+        realAudioVisualizer = bool("realAudioVisualizer", bool("hasCompletedOnboarding", false))
+        aiUsageEnabled = bool("aiUsageEnabled", false)
+        var sourceKeys = defaults.stringArray(forKey: "aiProviders") ?? AIProvider.allCases.map(\.rawValue)
+        // Version 2 added Cursor, Grok, Kimi, OpenCode and Amp: switch them on once.
+        if defaults.integer(forKey: "usageSourcesVersion") < 2 {
+            sourceKeys += AIProvider.allCases.map(\.rawValue).filter { !sourceKeys.contains($0) }
+            defaults.set(2, forKey: "usageSourcesVersion")
+        }
+        usageSourceKeys = sourceKeys
+        customProviders = defaults.data(forKey: "customProviders")
+            .flatMap { try? JSONDecoder().decode([CustomAIProvider].self, from: $0) } ?? []
         keepShelfItems = bool("keepShelfItems", true)
         openShelfOnDrag = bool("openShelfOnDrag", true)
         showAirDrop = bool("showAirDrop", true)
-        mirrorEnabled = bool("mirrorEnabled", true)
     }
 
     /// The app used to be called LephorNotch (bundle ID com.lephorx.LephorNotch).
@@ -129,6 +162,10 @@ final class AppSettings {
 
     private func save(_ value: Any, _ key: String) {
         defaults.set(value, forKey: key)
+    }
+
+    private func saveShortcut(_ shortcut: KeyShortcut?, _ key: String) {
+        defaults.set(shortcut.flatMap { try? JSONEncoder().encode($0) } ?? Data(), forKey: key)
     }
 
     private func saveGradient(_ gradient: NotchGradient, _ key: String) {

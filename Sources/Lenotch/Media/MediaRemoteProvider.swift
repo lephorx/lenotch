@@ -158,13 +158,14 @@ private final class StreamReader: @unchecked Sendable {
     }
 
     private var buffer = Data()
-    private var lastArtworkData: String?
+    /// Hash of the last artwork's base64 text, so it's only decoded when it changes.
+    private var lastArtworkHash: Int?
     private var artwork: NSImage?
     private let dateFormatter = ISO8601DateFormatter()
 
     func reset() {
         buffer.removeAll()
-        lastArtworkData = nil
+        lastArtworkHash = nil
         artwork = nil
     }
 
@@ -184,11 +185,12 @@ private final class StreamReader: @unchecked Sendable {
     private func snapshot(from payload: Payload) -> PlaybackSnapshot? {
         guard let title = payload.title, !title.isEmpty else { return nil }
 
-        if payload.artworkData != lastArtworkData {
-            lastArtworkData = payload.artworkData
+        let artworkHash = payload.artworkData?.hashValue
+        if artworkHash != lastArtworkHash {
+            lastArtworkHash = artworkHash
             artwork = payload.artworkData
                 .flatMap { Data(base64Encoded: $0, options: .ignoreUnknownCharacters) }
-                .flatMap(NSImage.init(data:))
+                .flatMap { ImageDownsampling.image(from: $0) }
         }
 
         let track = Track(title: title,

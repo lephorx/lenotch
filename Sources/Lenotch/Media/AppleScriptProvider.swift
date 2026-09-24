@@ -71,7 +71,13 @@ final class AppleScriptProvider: PlaybackProvider {
     private let player: Player
     private let queue = DispatchQueue(label: "Lenotch.AppleScript")
     private var timer: DispatchSourceTimer?
-    private lazy var stateScript = NSAppleScript(source: player.stateScript)
+    /// Compiled once: compiling runs a malware scan, which is too costly to repeat every second.
+    private lazy var stateScript: NSAppleScript? = {
+        let script = NSAppleScript(source: player.stateScript)
+        var error: NSDictionary?
+        script?.compileAndReturnError(&error)
+        return script
+    }()
 
     // Only touched on `queue`.
     private var lastTrackID: String?
@@ -136,16 +142,26 @@ final class AppleScriptProvider: PlaybackProvider {
         !NSRunningApplication.runningApplications(withBundleIdentifier: player.bundleIdentifier).isEmpty
     }
 
+    /// Only talk to the player once the user has allowed it (Settings → Permissions);
+    /// sending an Apple Event without permission would make macOS ask on its own.
+    private var isAllowed: Bool { Self.isAllowed(player.bundleIdentifier) }
+
+    static func isAllowed(_ bundleIdentifier: String) -> Bool {
+        let target = NSAppleEventDescriptor(bundleIdentifier: bundleIdentifier)
+        guard let descriptor = target.aeDesc else { return false }
+        return AEDeterminePermissionToAutomateTarget(descriptor, typeWildCard, typeWildCard, false) == noErr
+    }
+
     private func command(_ body: String) {
         queue.async { [self] in
-            guard isPlayerRunning else { return }
+            guard isPlayerRunning, isAllowed else { return }
             execute("tell application \"\(player.scriptName)\" to \(body)")
             poll()
         }
     }
 
     private func poll() {
-        let snapshot = isPlayerRunning ? readState() : nil
+        let snapshot = isPlayerRunning && isAllowed ? readState() : nil
         DispatchQueue.main.async { [weak self] in
             guard let self, self.timer != nil else { return }
             self.onUpdate?(snapshot)
@@ -196,7 +212,7 @@ final class AppleScriptProvider: PlaybackProvider {
         switch player {
         case .spotify:
             guard let url = url.flatMap(URL.init(string:)), let data = try? Data(contentsOf: url) else { return nil }
-            return NSImage(data: data)
+            return ImageDownsampling.image(from: data)
         case .music:
             let data = execute("""
                 tell application "Music"
@@ -205,7 +221,7 @@ final class AppleScriptProvider: PlaybackProvider {
                     end try
                 end tell
                 """)?.data
-            return data.flatMap(NSImage.init(data:))
+            return data.flatMap { ImageDownsampling.image(from: $0) }
         }
     }
 

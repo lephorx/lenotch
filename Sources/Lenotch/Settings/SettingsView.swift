@@ -1,24 +1,101 @@
 import ServiceManagement
 import SwiftUI
 
+/// Settings sections, listed in the sidebar.
+enum SettingsSection: String, CaseIterable, Identifiable {
+    case general, appearance, media, aiUsage, shelf, permissions
+
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .general: "General"
+        case .appearance: "Appearance"
+        case .media: "Media"
+        case .aiUsage: "AI Usage"
+        case .shelf: "Shelf"
+        case .permissions: "Permissions"
+        }
+    }
+
+    var symbol: String {
+        switch self {
+        case .general: "gearshape.fill"
+        case .appearance: "paintbrush.fill"
+        case .media: "music.note"
+        case .aiUsage: "sparkles"
+        case .shelf: "tray.full.fill"
+        case .permissions: "hand.raised.fill"
+        }
+    }
+
+    /// Tile colour behind the white icon, like System Settings.
+    var tint: Color {
+        switch self {
+        case .general: .gray
+        case .appearance: .indigo
+        case .media: .pink
+        case .aiUsage: .orange
+        case .shelf: .blue
+        case .permissions: .green
+        }
+    }
+}
+
 struct SettingsView: View {
     @Bindable var settings: AppSettings
     let shelf: ShelfStore
+    let permissions: PermissionCenter
     let showOnboarding: () -> Void
+    let playIntro: () -> Void
+
+    @State private var section: SettingsSection? = .general
 
     var body: some View {
-        TabView {
-            GeneralSettings(settings: settings, showOnboarding: showOnboarding)
-                .tabItem { Label("General", systemImage: "gearshape") }
-            AppearanceSettings(settings: settings)
-                .tabItem { Label("Appearance", systemImage: "paintbrush") }
-            MediaSettings(settings: settings)
-                .tabItem { Label("Media", systemImage: "music.note") }
-            ShelfSettings(settings: settings, shelf: shelf)
-                .tabItem { Label("Shelf", systemImage: "tray.full") }
+        NavigationSplitView {
+            List(SettingsSection.allCases, selection: $section) { section in
+                Label {
+                    Text(section.title)
+                } icon: {
+                    Image(systemName: section.symbol)
+                        .font(.system(size: 11, weight: .semibold))
+                        .foregroundStyle(.white)
+                        .frame(width: 22, height: 22)
+                        .background(RoundedRectangle(cornerRadius: 6, style: .continuous).fill(section.tint.gradient))
+                }
+                .tag(section)
+            }
+            .navigationSplitViewColumnWidth(190)
+        } detail: {
+            detail
+                .navigationTitle(section?.title ?? "Settings")
         }
-        .padding(.top, 28)
-        .frame(width: 580, height: 500)
+        .frame(width: 780, height: 580)
+    }
+
+    @ViewBuilder
+    private var detail: some View {
+        switch section ?? .general {
+        case .general:
+            GeneralSettings(settings: settings, showOnboarding: showOnboarding, playIntro: playIntro)
+        case .appearance:
+            AppearanceSettings(settings: settings)
+        case .media:
+            MediaSettings(settings: settings)
+        case .aiUsage:
+            AIUsageSettings(settings: settings)
+        case .shelf:
+            ShelfSettings(settings: settings, shelf: shelf)
+        case .permissions:
+            Form {
+                Section {
+                    PermissionsView(permissions: permissions, settings: settings)
+                } footer: {
+                    Text("macOS only asks when you click Allow. Anything you don't allow is never asked for.")
+                }
+            }
+            .formStyle(.grouped)
+        }
     }
 }
 
@@ -27,6 +104,7 @@ struct SettingsView: View {
 private struct GeneralSettings: View {
     @Bindable var settings: AppSettings
     let showOnboarding: () -> Void
+    let playIntro: () -> Void
 
     @State private var launchAtLogin = SMAppService.mainApp.status == .enabled
 
@@ -49,21 +127,29 @@ private struct GeneralSettings: View {
                 }
             }
             Section {
-                Toggle("Camera mirror button", isOn: $settings.mirrorEnabled)
+                Toggle("Show battery percentage", isOn: $settings.showBatteryPercentage)
             } header: {
-                Text("Mirror")
-            } footer: {
-                Text("A camera button in the notch opens a small mirror beside it. The camera only runs while the mirror is showing, and turns off when the notch closes.")
+                Text("Battery")
             }
-            Section("Battery") {
-                Toggle("Show battery in the notch", isOn: $settings.showBattery)
-                Toggle("Show percentage", isOn: $settings.showBatteryPercentage)
-                    .disabled(!settings.showBattery)
+            Section {
+                LabeledContent("Open or close the notch") {
+                    ShortcutRecorder(shortcut: $settings.toggleShortcut, defaultShortcut: .toggleDefault)
+                }
+                LabeledContent("Peek at the current song") {
+                    ShortcutRecorder(shortcut: $settings.peekShortcut, defaultShortcut: .peekDefault)
+                }
+            } header: {
+                Text("Keyboard shortcuts")
+            } footer: {
+                Text("Work in any app. Peek shows the song and artist under the notch for a few seconds, and does nothing when nothing is playing.")
             }
             Section("App") {
                 Toggle("Launch at login", isOn: $launchAtLogin)
                 LabeledContent("Welcome screen") {
                     Button("Show Again…", action: showOnboarding)
+                }
+                LabeledContent("Intro animation") {
+                    Button("Play Intro", action: playIntro)
                 }
             }
         }
@@ -229,9 +315,9 @@ private struct ShelfSettings: View {
     var body: some View {
         Form {
             Section {
-                Toggle("Enable the shelf tab", isOn: $settings.shelfEnabled)
-            } footer: {
                 Text("Drop files on the notch to keep them handy, then drag them out wherever you need them.")
+                    .font(.callout)
+                    .foregroundStyle(.secondary)
             }
             Section("Behaviour") {
                 Toggle("Open the shelf when dragging files onto the notch", isOn: $settings.openShelfOnDrag)
@@ -239,7 +325,6 @@ private struct ShelfSettings: View {
                     .onChange(of: settings.keepShelfItems) { shelf.persist() }
                 Toggle("Show AirDrop target", isOn: $settings.showAirDrop)
             }
-            .disabled(!settings.shelfEnabled)
             Section {
                 LabeledContent("\(shelf.items.count) item\(shelf.items.count == 1 ? "" : "s") on the shelf") {
                     Button("Clear Shelf", role: .destructive) { shelf.removeAll() }

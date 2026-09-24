@@ -1,0 +1,199 @@
+import AppKit
+import SwiftUI
+
+/// Scrollable day strip with the selected day's events underneath, shown to the
+/// right of the music.
+struct CalendarPanel: View {
+    let model: NotchViewModel
+    let width: CGFloat
+
+    private var calendar: CalendarService { model.calendar }
+
+    var body: some View {
+        TimelineView(.everyMinute) { context in
+            VStack(alignment: .leading, spacing: 6) {
+                Text(calendar.selectedDay, format: .dateTime.month(.wide).year())
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundStyle(.white.opacity(0.75))
+                    .contentTransition(.numericText())
+                    .animation(.easeOut(duration: 0.2), value: calendar.selectedDay)
+                DayStrip(calendar: calendar, width: width)
+                    .onHover { model.isOverHorizontalScroller = $0 }
+                content(now: context.date)
+            }
+        }
+        .frame(width: width, alignment: .leading)
+        .frame(maxHeight: .infinity, alignment: .top)
+        // Reload while visible only; the task stops when the notch closes.
+        .task {
+            calendar.select(Date())
+            while !Task.isCancelled {
+                calendar.refresh()
+                try? await Task.sleep(for: .seconds(60))
+            }
+        }
+        .onDisappear { model.isOverHorizontalScroller = false }
+    }
+
+    @ViewBuilder
+    private func content(now: Date) -> some View {
+        switch calendar.access {
+        case .unknown:
+            EmptyView()
+        case .notAsked:
+            // Nothing is asked for until the user wants their events here.
+            Button {
+                calendar.refresh(askIfNeeded: true)
+            } label: {
+                Label("Show my events", systemImage: "calendar.badge.plus")
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundStyle(.white.opacity(0.85))
+            }
+            .buttonStyle(.plain)
+            .padding(.top, 4)
+        case .denied:
+            VStack(alignment: .leading, spacing: 4) {
+                Text("Calendar access is off")
+                    .font(.system(size: 12, weight: .medium))
+                    .foregroundStyle(.white.opacity(0.6))
+                Button("Allow in Settings", action: calendar.openPrivacySettings)
+                    .buttonStyle(.plain)
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundStyle(.white.opacity(0.85))
+            }
+        case .granted:
+            if calendar.events.isEmpty {
+                Text(Calendar.current.isDateInToday(calendar.selectedDay) ? "No more events today" : "No events")
+                    .font(.system(size: 12, weight: .medium))
+                    .foregroundStyle(.white.opacity(0.5))
+                    .padding(.top, 4)
+            } else {
+                ScrollView(.vertical, showsIndicators: false) {
+                    VStack(alignment: .leading, spacing: 8) {
+                        ForEach(calendar.events) { event in
+                            Button(action: calendar.openCalendarApp) {
+                                EventRow(event: event, now: now)
+                            }
+                            .buttonStyle(.plain)
+                        }
+                    }
+                }
+                .id(calendar.selectedDay)
+                .transition(.opacity)
+            }
+        }
+    }
+}
+
+/// Horizontally scrolling days that snap to the centre.
+private struct DayStrip: View {
+    let calendar: CalendarService
+    let width: CGFloat
+
+    @State private var centered: Date?
+
+    private static let cellWidth: CGFloat = 30
+    private static let spacing: CGFloat = 6
+    /// Days before and after today that can be scrolled to.
+    private static let range = -7...14
+
+    private let days: [Date] = {
+        let today = Calendar.current.startOfDay(for: Date())
+        return range.compactMap { Calendar.current.date(byAdding: .day, value: $0, to: today) }
+    }()
+
+    var body: some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: Self.spacing) {
+                ForEach(days, id: \.self) { day in
+                    DayCell(day: day, isSelected: day == calendar.selectedDay)
+                        .id(day)
+                        .onTapGesture {
+                            withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) { centered = day }
+                        }
+                }
+            }
+            .scrollTargetLayout()
+        }
+        .contentMargins(.horizontal, (width - Self.cellWidth) / 2, for: .scrollContent)
+        .scrollTargetBehavior(.viewAligned)
+        .scrollPosition(id: $centered, anchor: .center)
+        .frame(width: width, height: 40)
+        // Fade the days out towards the edges.
+        .mask(LinearGradient(stops: [.init(color: .clear, location: 0), .init(color: .black, location: 0.18),
+                                     .init(color: .black, location: 0.82), .init(color: .clear, location: 1)],
+                             startPoint: .leading, endPoint: .trailing))
+        .onAppear { centered = calendar.selectedDay }
+        .onChange(of: calendar.selectedDay) { _, day in
+            if centered != day { centered = day }
+        }
+        .onChange(of: centered) { _, day in
+            guard let day else { return }
+            guard day != calendar.selectedDay else { return }
+            withAnimation(.easeOut(duration: 0.15)) { calendar.select(day) }
+            NSHapticFeedbackManager.defaultPerformer.perform(.generic, performanceTime: .now)
+        }
+    }
+}
+
+private struct DayCell: View {
+    let day: Date
+    let isSelected: Bool
+
+    private var isToday: Bool { Calendar.current.isDateInToday(day) }
+
+    var body: some View {
+        VStack(spacing: 2) {
+            Text(day, format: .dateTime.weekday(.narrow))
+                .font(.system(size: 9, weight: .semibold))
+                .foregroundStyle(isSelected ? .white.opacity(0.85) : .white.opacity(0.45))
+            Text(day, format: .dateTime.day())
+                .font(.system(size: 14, weight: .bold).monospacedDigit())
+                .foregroundStyle(isSelected ? .white : isToday ? .red : .white.opacity(0.75))
+        }
+        .frame(width: 30, height: 38)
+        .background {
+            RoundedRectangle(cornerRadius: 10, style: .continuous)
+                .fill(isSelected ? (isToday ? Color.red : Color.white.opacity(0.18)) : .clear)
+        }
+        .contentShape(Rectangle())
+        .animation(.easeOut(duration: 0.15), value: isSelected)
+    }
+}
+
+private struct EventRow: View {
+    let event: CalendarEvent
+    let now: Date
+
+    var body: some View {
+        HStack(spacing: 8) {
+            Capsule()
+                .fill(event.color)
+                .frame(width: 3, height: 26)
+            VStack(alignment: .leading, spacing: 1) {
+                Text(event.title)
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundStyle(.white)
+                    .lineLimit(1)
+                HStack(spacing: 4) {
+                    if event.isHappening(at: now), !event.isAllDay {
+                        Text("Now")
+                            .font(.system(size: 10, weight: .bold))
+                            .foregroundStyle(event.color)
+                    }
+                    Text(timeText)
+                        .font(.system(size: 11, weight: .medium).monospacedDigit())
+                        .foregroundStyle(.white.opacity(0.5))
+                }
+            }
+            Spacer(minLength: 0)
+        }
+        .contentShape(Rectangle())
+    }
+
+    private var timeText: String {
+        if event.isAllDay { return "All day" }
+        let time = Date.FormatStyle(date: .omitted, time: .shortened)
+        return "\(event.start.formatted(time)) – \(event.end.formatted(time))"
+    }
+}

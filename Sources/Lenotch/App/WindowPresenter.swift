@@ -5,8 +5,10 @@ import SwiftUI
 /// accessory, so windows have to be brought to the front explicitly.
 final class WindowPresenter {
     private var windows: [String: NSWindow] = [:]
+    private var closeObservers: [String: NSObjectProtocol] = [:]
 
-    func show<Content: View>(id: String, title: String, content: () -> Content) {
+    /// `floating` keeps the window above others, e.g. while permission prompts come and go.
+    func show<Content: View>(id: String, title: String, floating: Bool = false, content: () -> Content) {
         if let window = windows[id] {
             bringToFront(window)
             return
@@ -19,7 +21,19 @@ final class WindowPresenter {
         window.titlebarAppearsTransparent = true
         window.isReleasedWhenClosed = false
         window.center()
+        if floating { window.level = .floating }
         windows[id] = window
+        // Release the window and its SwiftUI views when it's closed.
+        closeObservers[id] = NotificationCenter.default.addObserver(
+            forName: NSWindow.willCloseNotification, object: window, queue: .main
+        ) { [weak self] _ in
+            guard let self else { return }
+            if let observer = self.closeObservers.removeValue(forKey: id) {
+                NotificationCenter.default.removeObserver(observer)
+            }
+            self.windows[id] = nil
+            DispatchQueue.main.async { window.contentViewController = nil }
+        }
         bringToFront(window)
     }
 

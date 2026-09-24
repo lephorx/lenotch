@@ -1,12 +1,22 @@
 #!/usr/bin/env bash
-# Regenerates Resources/AppIcon.icns from Resources/logo.png.
+# Regenerates Resources/logo-white.png (from lephor_logo_white.png if present, else logo.png)
+# and Resources/AppIcon.icns.
 set -euo pipefail
 cd "$(dirname "$0")/.."
 TMP="$(mktemp -d)"
 trap 'rm -rf "$TMP"' EXIT
 
+# Prefer the hand-made white logo; otherwise derive one from the blue logo.
+if [ -f Resources/lephor_logo_white.png ]; then
+  swiftc -o "$TMP/crop_logo" scripts/crop_logo.swift
+  "$TMP/crop_logo" Resources/lephor_logo_white.png Resources/logo-white.png
+else
+  swiftc -o "$TMP/make_white_logo" scripts/make_white_logo.swift
+  "$TMP/make_white_logo" Resources/logo.png Resources/logo-white.png
+fi
+
 swiftc -parse-as-library -o "$TMP/make_icon" scripts/make_icon.swift
-"$TMP/make_icon" Resources/logo.png "$TMP/icon_1024.png"
+"$TMP/make_icon" Resources/logo-white.png "$TMP/icon_1024.png"
 
 SET="$TMP/AppIcon.iconset"
 mkdir -p "$SET"

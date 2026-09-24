@@ -127,8 +127,18 @@ final class NowPlayingService {
         provider?.setFavorite(!isFavorite)
     }
 
-    func nextTrack() { provider?.nextTrack() }
-    func previousTrack() { provider?.previousTrack() }
+    /// Direction of the last skip, for the cover's slide.
+    private(set) var skippedForward = true
+
+    func nextTrack() {
+        skippedForward = true
+        provider?.nextTrack()
+    }
+
+    func previousTrack() {
+        skippedForward = false
+        provider?.previousTrack()
+    }
 
     func seek(to seconds: Double) {
         elapsedAtTimestamp = seconds
@@ -206,7 +216,7 @@ final class NowPlayingService {
         guard bundleID != appIconBundleID else { return }
         appIconBundleID = bundleID
         if let bundleID, let url = NSWorkspace.shared.urlForApplication(withBundleIdentifier: bundleID) {
-            appIcon = NSWorkspace.shared.icon(forFile: url.path)
+            appIcon = ImageDownsampling.icon(forFile: url.path, points: 120)
             appName = FileManager.default.displayName(atPath: url.path)
                 .replacingOccurrences(of: ".app", with: "")
         } else {

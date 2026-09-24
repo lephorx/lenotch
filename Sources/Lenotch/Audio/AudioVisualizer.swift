@@ -1,3 +1,4 @@
+import Accelerate
 import AudioToolbox
 import CoreAudio
 import Foundation
@@ -17,6 +18,8 @@ final class AudioVisualizer: @unchecked Sendable {
     /// After a failed start, don't retry before this time.
     private var retryAfter = Date.distantPast
     private let analyzer = SpectrumAnalyzer()
+    /// Mono mix-down buffer, reused across callbacks (only touched on `queue`).
+    private var mono: [Float] = []
     private var tapID = AudioObjectID(kAudioObjectUnknown)
     private var aggregateID = AudioObjectID(kAudioObjectUnknown)
     private var procID: AudioDeviceIOProcID?
@@ -142,7 +145,8 @@ final class AudioVisualizer: @unchecked Sendable {
         let frames = Int(first.mDataByteSize) / MemoryLayout<Float>.size / (nonInterleaved ? 1 : channels)
         guard frames > 0 else { return }
 
-        var mono = [Float](repeating: 0, count: frames)
+        if mono.count < frames { mono = [Float](repeating: 0, count: frames) }
+        mono.withUnsafeMutableBufferPointer { $0.update(repeating: 0) }
         if nonInterleaved {
             for buffer in buffers {
                 guard let samples = buffer.mData?.assumingMemoryBound(to: Float.self) else { continue }
@@ -157,9 +161,10 @@ final class AudioVisualizer: @unchecked Sendable {
             }
         }
 
-        let peak = mono.lazy.map(abs).max() ?? 0
+        let peak = mono.withUnsafeBufferPointer { vDSP.maximumMagnitude(UnsafeBufferPointer(rebasing: $0[..<frames])) }
         let sampleRate = Float(format.mSampleRate > 0 ? format.mSampleRate : 48_000)
-        guard mono.withUnsafeBufferPointer({ analyzer.process($0, sampleRate: sampleRate) }) else { return }
+        guard mono.withUnsafeBufferPointer({ analyzer.process(UnsafeBufferPointer(rebasing: $0[..<frames]),
+                                                              sampleRate: sampleRate) }) else { return }
 
         let newLevels = analyzer.levels
         lock.withLock {

@@ -11,6 +11,7 @@ struct BatteryView: View {
             if showsPercentage {
                 Text("\(Int((battery.level * 100).rounded()))%")
                     .monospacedDigit()
+                    .fixedSize()
                     .foregroundStyle(battery.isLowPowerMode ? AnyShapeStyle(.yellow) : AnyShapeStyle(.foreground))
             }
             ZStack(alignment: .leading) {

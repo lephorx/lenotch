@@ -5,6 +5,8 @@ import Observation
 @Observable
 final class ShelfStore {
     private(set) var items: [URL] = []
+    /// Small file icons, made once per item.
+    @ObservationIgnored private var icons: [URL: NSImage] = [:]
 
     @ObservationIgnored private let settings: AppSettings
     @ObservationIgnored private let defaults: UserDefaults
@@ -29,12 +31,21 @@ final class ShelfStore {
 
     func remove(_ url: URL) {
         items.removeAll { $0 == url }
+        icons[url] = nil
         persist()
     }
 
     func removeAll() {
         items.removeAll()
+        icons.removeAll()
         persist()
+    }
+
+    func icon(for url: URL) -> NSImage {
+        if let icon = icons[url] { return icon }
+        let icon = ImageDownsampling.icon(forFile: url.path, points: 42)
+        icons[url] = icon
+        return icon
     }
 
     /// Called when the "keep after restart" setting changes.

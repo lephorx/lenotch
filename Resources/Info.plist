@@ -30,6 +30,12 @@
 	<string>Lenotch reads what Spotify or Music is playing and controls playback from the notch.</string>
 	<key>NSAudioCaptureUsageDescription</key>
 	<string>Lenotch listens to the sound your Mac is playing to animate the equalizer bars. Nothing is recorded or stored.</string>
+	<key>NSCalendarsFullAccessUsageDescription</key>
+	<string>Lenotch shows your upcoming events next to the music in the notch.</string>
+	<key>NSCalendarsUsageDescription</key>
+	<string>Lenotch shows your upcoming events next to the music in the notch.</string>
+	<key>NSCameraReactionEffectGesturesEnabledDefault</key>
+	<false/>
 	<key>NSCameraUsageDescription</key>
 	<string>Lenotch shows your camera in the notch as a quick mirror. Nothing is recorded.</string>
 	<key>NSHighResolutionCapable</key>

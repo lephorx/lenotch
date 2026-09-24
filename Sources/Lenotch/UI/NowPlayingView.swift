@@ -29,19 +29,32 @@ struct NowPlayingView: View {
                                          action: media.toggleFavorite)
                     }
                 }
-                Spacer(minLength: 8)
+                Spacer(minLength: 4)
                 ProgressBar(model: model, duration: track.duration)
-                Spacer(minLength: 6)
+                Spacer(minLength: 4)
                 controls
             }
-            .frame(height: 124)
+            // Tall enough for title, progress (with its larger click area) and controls,
+            // so nothing is pushed up and clipped.
+            .frame(height: 138)
         }
     }
 
     private var artwork: some View {
         Button(action: media.openSourceApp) {
-            ArtworkView(artwork: media.artwork, fallback: media.appIcon, cornerRadius: 24)
-                .frame(width: 120, height: 120)
+            // New songs slide in from the side they were skipped towards.
+            ZStack {
+                ArtworkView(artwork: media.artwork, fallback: media.appIcon, cornerRadius: 24)
+                    .id(track.title + "\u{1}" + track.artist)
+                    .transition(.asymmetric(
+                        insertion: .push(from: media.skippedForward ? .trailing : .leading)
+                            .combined(with: .scale(scale: 0.85)),
+                        removal: .push(from: media.skippedForward ? .trailing : .leading)
+                            .combined(with: .opacity)))
+            }
+            .frame(width: 120, height: 120)
+            .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
+            .animation(.spring(response: 0.5, dampingFraction: 0.78), value: track.title + track.artist)
                 .overlay(alignment: .bottomTrailing) {
                     // Player badge, since the header shows tabs instead of the app name.
                     if media.artwork != nil, let icon = media.appIcon {

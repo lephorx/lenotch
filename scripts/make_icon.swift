@@ -1,4 +1,4 @@
-// Renders the Lenotch app icon (1024×1024) from Resources/logo.png.
+// Renders the Lenotch app icon (1024×1024) from the white logo.
 // Run: ./scripts/make_icon.sh
 import AppKit
 import SwiftUI
@@ -13,8 +13,8 @@ struct IconView: View {
             tile.fill(LinearGradient(colors: [Color(red: 0.11, green: 0.13, blue: 0.19),
                                               Color(red: 0.02, green: 0.03, blue: 0.05)],
                                      startPoint: .top, endPoint: .bottom))
-            // Soft blue glow behind the logo.
-            tile.fill(RadialGradient(colors: [Color(red: 0.16, green: 0.45, blue: 0.95).opacity(0.45), .clear],
+            // Soft light behind the logo.
+            tile.fill(RadialGradient(colors: [.white.opacity(0.14), .clear],
                                      center: UnitPoint(x: 0.5, y: 0.62), startRadius: 0, endRadius: 430))
             // The notch, flush with the top edge.
             NotchOutline()
@@ -25,7 +25,7 @@ struct IconView: View {
                 .resizable()
                 .aspectRatio(contentMode: .fit)
                 .frame(height: 400)
-                .shadow(color: Color(red: 0.2, green: 0.5, blue: 1).opacity(0.55), radius: 40)
+                .shadow(color: .white.opacity(0.35), radius: 36)
                 .offset(y: 50)
         }
         .frame(width: 824, height: 824)

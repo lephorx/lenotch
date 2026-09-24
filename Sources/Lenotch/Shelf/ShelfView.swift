@@ -78,7 +78,7 @@ private struct ShelfItemView: View {
 
     var body: some View {
         VStack(spacing: 4) {
-            Image(nsImage: NSWorkspace.shared.icon(forFile: url.path))
+            Image(nsImage: shelf.icon(for: url))
                 .resizable()
                 .frame(width: 42, height: 42)
             Text(url.lastPathComponent)

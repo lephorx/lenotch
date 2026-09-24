@@ -7,6 +7,9 @@ final class NotchWindowController {
     private let panel: NotchPanel
     /// Separate panel for the camera popup to the right of the notch.
     private let mirrorPanel: NotchPanel
+    /// Speech bubble below the notch for the hovered AI usage ring; never takes the mouse.
+    private let tooltipPanel: NotchPanel
+    private static let tooltipHeight: CGFloat = 320
     private let model: NotchViewModel
     private var monitors: [Any] = []
     private var pendingTransition: DispatchWorkItem?
@@ -15,6 +18,12 @@ final class NotchWindowController {
     private var dragChangeCount = NSPasteboard(name: .drag).changeCount
 
     private static let closeDelay = 0.2
+    private static let peekDuration = 3.0
+
+    /// Opened with the keyboard shortcut: stays open until the shortcut, a click
+    /// elsewhere, or the pointer entering and then leaving the notch.
+    private var openedByKeyboard = false
+    private var peekEnd: DispatchWorkItem?
     /// Horizontal finger travel (points) that counts as a tab swipe.
     private static let swipeThreshold: CGFloat = 60
 
@@ -33,10 +42,17 @@ final class NotchWindowController {
         panel.ignoresMouseEvents = true
         panel.orderFrontRegardless()
 
-        mirrorPanel = NotchPanel(contentRect: geometry.mirrorWindowFrame)
+        mirrorPanel = NotchPanel(contentRect: geometry.mirrorWindowFrame(openWidth: geometry.openSize.width))
         mirrorPanel.contentView = NotchHostingView(rootView: MirrorPopup(model: model))
         mirrorPanel.ignoresMouseEvents = true
         mirrorPanel.orderFrontRegardless()
+
+        tooltipPanel = NotchPanel(contentRect: NSRect(x: 0, y: 0, width: UsageTooltip.width, height: Self.tooltipHeight))
+        tooltipPanel.contentView = NotchHostingView(rootView: UsageTooltip(model: model))
+        tooltipPanel.ignoresMouseEvents = true
+        tooltipPanel.orderFrontRegardless()
+        model.onUsageHoverChange = { [weak self] in self?.positionTooltip() }
+        model.onOpenSizeChange = { [weak self] in self?.positionMirror() }
 
         installMouseMonitors()
         #if DEBUG
@@ -52,6 +68,17 @@ final class NotchWindowController {
         monitors.forEach(NSEvent.removeMonitor)
     }
 
+    /// Puts the usage bubble just below the open notch, centred on the hovered ring.
+    private func positionTooltip() {
+        guard let hover = model.usageHover else { return }
+        let screen = model.geometry.screenFrame
+        let notchBottom = screen.maxY - model.currentSize.height
+        let ringX = panel.frame.minX + hover.anchorX
+        let x = min(max(ringX - UsageTooltip.width / 2, screen.minX + 8), screen.maxX - UsageTooltip.width - 8)
+        tooltipPanel.setFrame(NSRect(x: x, y: notchBottom - 2 - Self.tooltipHeight,
+                                     width: UsageTooltip.width, height: Self.tooltipHeight), display: true)
+    }
+
     /// Prefer the built-in display with a notch, otherwise the main screen.
     private static func targetScreen() -> NSScreen {
         NSScreen.screens.first { $0.safeAreaInsets.top > 0 } ?? NSScreen.main ?? NSScreen.screens[0]
@@ -60,7 +87,12 @@ final class NotchWindowController {
     private func relayout() {
         model.geometry = NotchGeometry(screen: Self.targetScreen())
         panel.setFrame(model.geometry.windowFrame, display: true)
-        mirrorPanel.setFrame(model.geometry.mirrorWindowFrame, display: true)
+        positionMirror()
+    }
+
+    /// Keeps the camera popup just right of the open notch, whose width depends on the page.
+    private func positionMirror() {
+        mirrorPanel.setFrame(model.geometry.mirrorWindowFrame(openWidth: model.openWidth), display: true)
     }
 
     // MARK: - Mouse
@@ -91,9 +123,13 @@ final class NotchWindowController {
     /// Two-finger horizontal swipes (trackpad or Magic Mouse) switch tabs, once per gesture.
     /// Returns nil when the event was used for a swipe.
     private func handleSwipe(_ event: NSEvent) -> NSEvent? {
-        guard model.state == .open, model.tabs.count > 1 else { return event }
+        guard model.state == .open, model.pages.count > 1,
+              !model.isOverHorizontalScroller else { return event }
+        #if DEBUG
+        if debugHoldOpen { return event }
+        #endif
         // A full shelf scrolls sideways instead (about five files fit without scrolling).
-        if model.visibleTab == .shelf, model.shelf.items.count > 5 { return event }
+        if model.visiblePage == .shelf, model.shelf.items.count > 5 { return event }
         // Ignore the inertia that keeps scrolling after the fingers lift.
         guard event.momentumPhase.isEmpty else { return swipeHandled ? nil : event }
 
@@ -112,14 +148,51 @@ final class NotchWindowController {
         if !swipeHandled, abs(swipeDistance) > Self.swipeThreshold {
             swipeHandled = true
             // Fingers moving left bring in the next tab, like paging.
-            model.selectTab(offset: swipeDistance < 0 ? 1 : -1)
+            model.selectPage(offset: swipeDistance < 0 ? 1 : -1)
             NSHapticFeedbackManager.defaultPerformer.perform(.generic, performanceTime: .now)
             return nil
         }
         return swipeHandled ? nil : event
     }
 
+    /// Plays the logo intro in the notch.
+    func playIntro() {
+        guard !model.isShowingIntro else { return }
+        setState(.closed)
+        cancelPending()
+        model.isShowingIntro = true
+    }
+
+    /// Keyboard shortcut: opens or closes the notch wherever the pointer is.
+    func toggleOpen() {
+        guard !model.isShowingIntro else { return }
+        cancelPending()
+        if model.state == .open {
+            setState(.closed)
+        } else {
+            openedByKeyboard = true
+            setState(.open)
+        }
+    }
+
+    /// Keyboard shortcut: briefly shows the current song under the closed notch, or
+    /// hides it again if it's showing. Does nothing when nothing is playing.
+    func peek() {
+        if model.isPeeking {
+            peekEnd?.cancel()
+            model.isPeeking = false
+            return
+        }
+        guard model.state == .closed, !model.isShowingIntro, model.media.track != nil else { return }
+        peekEnd?.cancel()
+        model.isPeeking = true
+        let end = DispatchWorkItem { [weak self] in self?.model.isPeeking = false }
+        peekEnd = end
+        DispatchQueue.main.asyncAfter(deadline: .now() + Self.peekDuration, execute: end)
+    }
+
     private func handle(_ event: NSEvent) {
+        guard !model.isShowingIntro else { return }
         let location = NSEvent.mouseLocation
         let geometry = model.geometry
         let settings = model.settings
@@ -137,10 +210,9 @@ final class NotchWindowController {
                 return
             }
 
-            if event.type == .leftMouseDragged, isDraggingContent,
-               settings.shelfEnabled, settings.openShelfOnDrag {
+            if event.type == .leftMouseDragged, isDraggingContent, settings.openShelfOnDrag {
                 cancelPending()
-                model.selectedTab = .shelf
+                model.selectedPage = .shelf
                 setState(.open)
             } else if settings.openMode == .click {
                 if event.type == .leftMouseDown { setState(.open) }
@@ -152,13 +224,24 @@ final class NotchWindowController {
             #if DEBUG
             if debugHoldOpen { return }
             #endif
-            let area = geometry.rect(for: geometry.openSize).insetBy(dx: -8, dy: -8)
+            let area = geometry.rect(for: model.currentSize).insetBy(dx: -8, dy: -8)
             // The camera popup counts as part of the notch while it's showing.
             let overMirror = model.isMirrorVisible
-                && geometry.mirrorWindowFrame.insetBy(dx: -8, dy: -8).contains(location)
+                && geometry.mirrorWindowFrame(openWidth: model.openWidth).insetBy(dx: -8, dy: -8).contains(location)
             // Stay open while a button is held, so scrubbing and drags in and out don't cut off.
             let buttonHeld = NSEvent.pressedMouseButtons & 1 != 0
-            if area.contains(location) || overMirror || model.isInteracting || buttonHeld {
+            let inside = area.contains(location) || overMirror
+            if openedByKeyboard {
+                // Keep it open until the pointer has been inside once, or the user clicks elsewhere.
+                if inside {
+                    openedByKeyboard = false
+                } else if event.type == .leftMouseDown {
+                    openedByKeyboard = false
+                    setState(.closed)
+                }
+                return
+            }
+            if inside || model.isInteracting || buttonHeld {
                 cancelPending()
             } else {
                 schedule(after: Self.closeDelay) { [weak self] in self?.setState(.closed) }
@@ -174,11 +257,19 @@ final class NotchWindowController {
         guard model.state != state else { return }
         model.state = state
         panel.ignoresMouseEvents = state == .closed
+        if state == .open {
+            peekEnd?.cancel()
+            model.isPeeking = false
+        } else {
+            openedByKeyboard = false
+            model.setUsageHover(nil)
+        }
         if state == .closed, model.isMirrorVisible {
             // The camera closes together with the notch.
             model.toggleMirror()
         }
         if state == .open {
+            positionMirror()
             NSHapticFeedbackManager.defaultPerformer.perform(.alignment, performanceTime: .now)
         }
     }
@@ -216,6 +307,7 @@ final class NotchWindowController {
                 case "snap":
                     self.debugSnapshot(self.panel, to: dir + "/snap-notch.png")
                     self.debugSnapshot(self.mirrorPanel, to: dir + "/snap-mirror.png")
+                    self.debugSnapshot(self.tooltipPanel, to: dir + "/snap-tooltip.png")
                 case "click" where parts.count == 3:
                     // Point in the notch panel, measured from its top-left corner.
                     if let x = Double(parts[1]), let y = Double(parts[2]) { self.debugClick(x: x, y: y) }
@@ -228,6 +320,22 @@ final class NotchWindowController {
                         while let current = view { chain.append(String(describing: type(of: current))); view = current.superview }
                         NSLog("Lenotch debug: hit (\(x), \(y)) -> \(chain.joined(separator: " < "))")
                     }
+                case "page" where parts.count == 2:
+                    if let index = Int(parts[1]), self.model.pages.indices.contains(index) {
+                        self.model.selectedPage = self.model.pages[index]
+                    }
+                case "intro": self.playIntro()
+                case "peek": self.peek()
+                case "settings":
+                    self.model.openSettings()
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 1) {
+                        if let window = NSApp.windows.first(where: { $0.title.contains("Settings") }) {
+                            self.debugSnapshot(window, to: dir + "/snap-settings.png")
+                        }
+                    }
+                case "usagehover" where parts.count == 3:
+                    if let x = Double(parts[2]) { self.model.setUsageHover(UsageHover(id: parts[1], anchorX: x)) }
+                case "toggle": self.toggleOpen()
                 case "open": self.setState(.open)
                 case "hold": self.debugHoldOpen = true; self.setState(.open)
                 case "release": self.debugHoldOpen = false
@@ -236,7 +344,8 @@ final class NotchWindowController {
                 default: break
                 }
             }
-            let status = "state=\(self.model.state) mirror=\(self.model.isMirrorVisible) camera=\(self.model.camera.status)\n"
+            let page = self.model.visiblePage.rawValue
+            let status = "state=\(self.model.state) page=\(page)/\(self.model.pages.count) mirror=\(self.model.isMirrorVisible) camera=\(self.model.camera.status)\n"
             try? status.write(toFile: output, atomically: true, encoding: .utf8)
         }
     }

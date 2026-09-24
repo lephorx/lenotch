@@ -1,8 +1,8 @@
 import SwiftUI
 
-/// Outline of the Lenotch "L" logo (Resources/logo.png), in unit coordinates.
+/// Outline of the Lenotch "L" logo (Resources/logo-white.png), in unit coordinates.
 struct LogoShape: Shape {
-    static let aspectRatio: CGFloat = 225.0 / 256.0
+    static let aspectRatio: CGFloat = 223.0 / 256.0
 
     private static let points: [CGPoint] = [
         CGPoint(x: 0, y: 0.2367),
@@ -23,8 +23,8 @@ struct LogoShape: Shape {
 }
 
 /// The app logo. In glass mode the logo itself is clear Liquid Glass in the
-/// logo's outline, like the playback icons; otherwise the image, recoloured
-/// to `color` when given.
+/// logo's outline, like the playback icons; otherwise the white logo, tinted
+/// with `color` (the song's colour) when given.
 struct AppLogo: View {
     let height: CGFloat
     let glass: Bool
@@ -34,9 +34,9 @@ struct AppLogo: View {
     var color: Color? = nil
 
     static let image: NSImage? = {
-        let url = Bundle.main.url(forResource: "logo", withExtension: "png")
+        let url = Bundle.main.url(forResource: "logo-white", withExtension: "png")
             ?? URL(fileURLWithPath: FileManager.default.currentDirectoryPath)
-                .appendingPathComponent("Resources/logo.png")
+                .appendingPathComponent("Resources/logo-white.png")
         return NSImage(contentsOf: url)
     }()
 
@@ -46,20 +46,27 @@ struct AppLogo: View {
             if glass {
                 GlassIcon(shape: LogoShape(), size: size, highlight: highlight)
             } else if let image = Self.image {
-                if let color {
-                    // Grayscale keeps the facets' light and dark; brightening then
-                    // multiplying paints them in the music's colour.
-                    Image(nsImage: image).resizable()
-                        .saturation(0)
-                        .brightness(0.35)
-                        .colorMultiply(color)
-                } else {
-                    Image(nsImage: image).resizable()
-                }
+                // The white logo's grey facets keep their shading when multiplied by a colour.
+                Image(nsImage: image).resizable()
+                    .colorMultiply(color ?? .white)
             } else {
                 Image(systemName: "music.note").resizable().aspectRatio(contentMode: .fit)
             }
         }
         .frame(width: size.width, height: size.height)
+    }
+}
+
+extension LogoShape {
+    /// The logo as a template image for the menu bar (tinted by macOS).
+    static func menuBarImage(height: CGFloat = 15) -> NSImage {
+        let size = NSSize(width: (height * aspectRatio).rounded(.up), height: height)
+        let image = NSImage(size: size, flipped: true) { rect in
+            NSColor.black.setFill()
+            NSBezierPath(cgPath: LogoShape().path(in: rect).cgPath).fill()
+            return true
+        }
+        image.isTemplate = true
+        return image
     }
 }

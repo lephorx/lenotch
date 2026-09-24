@@ -15,7 +15,11 @@ final class SpectrumAnalyzer {
     private let log2n: vDSP_Length = 10
     private let setup: FFTSetup
     private let window: [Float]
-    private var samples: [Float] = []
+    /// The latest `size` samples (oldest first) and how many arrived since the last analysis.
+    /// All buffers are allocated once and reused, so the audio thread doesn't allocate.
+    private var samples: [Float]
+    private var windowed: [Float]
+    private var newSamples = 0
     private var real: [Float]
     private var imag: [Float]
     private var magnitudes: [Float]
@@ -25,6 +29,8 @@ final class SpectrumAnalyzer {
     init() {
         setup = vDSP_create_fftsetup(log2n, FFTRadix(kFFTRadix2))!
         window = vDSP.window(ofType: Float.self, usingSequence: .hanningDenormalized, count: size, isHalfWindow: false)
+        samples = [Float](repeating: 0, count: size)
+        windowed = [Float](repeating: 0, count: size)
         real = [Float](repeating: 0, count: size / 2)
         imag = [Float](repeating: 0, count: size / 2)
         magnitudes = [Float](repeating: 0, count: size / 2)
@@ -36,12 +42,20 @@ final class SpectrumAnalyzer {
 
     /// Adds samples; returns true when the levels were updated.
     @discardableResult
-    func process(_ newSamples: UnsafeBufferPointer<Float>, sampleRate: Float) -> Bool {
-        samples.append(contentsOf: newSamples)
-        guard samples.count >= size else { return false }
-        if samples.count > size { samples.removeFirst(samples.count - size) }
+    func process(_ input: UnsafeBufferPointer<Float>, sampleRate: Float) -> Bool {
+        // Slide the window left and append the new samples at the end.
+        let count = min(input.count, size)
+        samples.withUnsafeMutableBufferPointer { buffer in
+            let base = buffer.baseAddress!
+            if count < size { base.update(from: base + count, count: size - count) }
+            (base + size - count).update(from: input.baseAddress! + (input.count - count), count: count)
+        }
+        newSamples += input.count
+        // Analyse every half window (50% overlap).
+        guard newSamples >= size / 2 else { return false }
+        newSamples = 0
 
-        let windowed = vDSP.multiply(samples, window)
+        vDSP.multiply(samples, window, result: &windowed)
         real.withUnsafeMutableBufferPointer { realPtr in
             imag.withUnsafeMutableBufferPointer { imagPtr in
                 var split = DSPSplitComplex(realp: realPtr.baseAddress!, imagp: imagPtr.baseAddress!)
@@ -71,7 +85,6 @@ final class SpectrumAnalyzer {
             // Jump up instantly, fall back smoothly.
             levels[index] = target > levels[index] ? target : levels[index] * 0.82 + target * 0.18
         }
-        samples.removeFirst(size / 2)  // 50% overlap between frames
         return true
     }
 }

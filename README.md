@@ -4,12 +4,12 @@ A black SwiftUI notch for MacBooks with a Now Playing live activity.
 
 - **Closed:** blends into the physical notch.
 - **Playing:** the notch widens to show the album art on the left and animated bars on the right.
-- **Open** (hover or click, you choose) has two tabs:
+- **Open** (hover or click, you choose) has fixed player, shelf, and AI usage tabs:
   - **Now Playing:** artwork, title, artist, a progress bar you can drag to seek, play/pause and skip, shuffle and repeat, and a favorite button (Apple Music).
   - **Shelf:** drop files on the notch to keep them, drag them back out, or AirDrop them. Dragging a file onto the closed notch opens the shelf.
   (The camera button in the header drops a small mirrored camera preview down beside the notch.)
 
-  Swipe left or right with two fingers to switch tabs.
+  Swipe left or right with two fingers to switch tabs. Scroll the calendar's day strip to change dates.
 - **Battery and clock** in the open notch.
 - **Audio source:** Playing Right Now (any app), Spotify, Apple Music or YouTube Music.
   Spotify and Music are read over AppleScript, so the notch follows them even when another
@@ -29,9 +29,23 @@ Requires macOS 14+ and Xcode / Swift 6 toolchain.
 ```bash
 ./build.sh run       # build build/Lenotch.app and launch it
 ./build.sh install   # copy to /Applications and launch
+./build.sh dmg       # package build/Lenotch.dmg (ARCHS="arm64 x86_64" for a universal build)
 ```
 
-## Layout
+## Releases
+
+GitHub Actions ([build-dmg.yml](.github/workflows/build-dmg.yml)) builds a universal
+`Lenotch.dmg` on every push to `main` and every pull request (download it from the run's
+artifacts). Pushing a version tag publishes it as a GitHub Release:
+
+```bash
+git tag v2.1 && git push origin v2.1
+```
+
+The app is ad-hoc signed, not notarized, so macOS blocks the first launch. Open it with
+right-click → Open, or run `xattr -dr com.apple.quarantine /Applications/Lenotch.app`.
+
+## Project structure
 
 ```
 Sources/Lenotch/
@@ -43,7 +57,7 @@ Sources/Lenotch/
   System/    battery monitor
   Settings/  settings window and first-launch setup
   Audio/     system audio tap and spectrum analysis for the visualizer
-scripts/make_icon.sh         regenerates Resources/AppIcon.icns from the logo
+scripts/make_icon.sh         regenerates the white logo and Resources/AppIcon.icns from logo.png
 Vendor/MediaRemoteAdapter/   BSD-3 licensed, see its LICENSE
 ```
 

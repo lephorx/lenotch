@@ -12,74 +12,80 @@ struct ExpandedView: View {
         VStack(spacing: 0) {
             header
                 .frame(height: model.geometry.notchSize.height)
-            ZStack {
-                tabContent
-                    .id(model.visibleTab)
-                    .transition(.push(from: model.tabMovesForward ? .trailing : .leading))
-            }
-            .padding(.horizontal, 30)
-            .padding(.bottom, 20)
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
-            .clipped()
+            pageContent
+                .id(model.visiblePage)
+                .transition(.push(from: model.pageMovesForward ? .trailing : .leading)
+                    .combined(with: .opacity)
+                    .combined(with: .blurReplace))
+                .padding(.horizontal, 30)
+                .padding(.bottom, 20)
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .clipped()
         }
-        // Dropping files anywhere on the open notch puts them on the shelf.
         .onDrop(of: [.fileURL], isTargeted: $isDropTargeted) { providers in
-            guard settings.shelfEnabled else { return false }
             ShelfStore.loadURLs(from: providers) { model.shelf.add($0) }
             return true
         }
         .onChange(of: isDropTargeted) { _, targeted in
-            if targeted, settings.shelfEnabled { model.select(.shelf) }
+            if targeted { model.select(.shelf) }
         }
     }
 
     @ViewBuilder
-    private var tabContent: some View {
-        switch model.visibleTab {
-        case .nowPlaying:
-            if let track = media.track {
-                NowPlayingView(model: model, track: track)
-            } else {
-                idle
+    private var pageContent: some View {
+        switch model.visiblePage {
+        case .player:
+            HStack(alignment: .top, spacing: 28) {
+                Group {
+                    if let track = media.track {
+                        NowPlayingView(model: model, track: track)
+                    } else {
+                        idle
+                    }
+                }
+                .frame(width: 400)
+                if model.isCalendarAllowed {
+                    CalendarPanel(model: model, width: 200)
+                }
             }
         case .shelf:
             ShelfView(model: model, isDropTargeted: isDropTargeted)
+                .frame(width: 440)
+        case .aiUsage:
+            // The AI page has the notch to itself, so it uses the full width (up to 8 rings per row).
+            AIUsageView(model: model)
+                .frame(maxWidth: .infinity)
         }
     }
 
-    /// Row beside the physical notch: tabs (or the player) on the left, buttons and battery on the right.
     private var header: some View {
         HStack {
-            if model.tabs.count > 1 {
-                TabSwitcher(model: model)
-            } else {
-                HStack(spacing: 6) {
-                    if media.track != nil, let icon = media.appIcon {
-                        Image(nsImage: icon).resizable().frame(width: 14, height: 14)
-                    }
-                    Text(media.track != nil ? media.appName ?? media.source.title : media.source.title)
-                        .lineLimit(1)
-                }
-            }
+            TabSwitcher(model: model)
             Spacer(minLength: model.geometry.notchSize.width + 16)
             HStack(spacing: 10) {
-                if settings.mirrorEnabled {
+                if model.isCameraAllowed {
                     HeaderButton(symbol: "camera.fill", label: "Mirror", isOn: model.isMirrorVisible,
                                  action: model.toggleMirror)
                 }
                 HeaderButton(symbol: "gearshape.fill", label: "Settings", action: model.openSettings)
-                if settings.showBattery, model.battery.hasBattery {
+                if model.battery.hasBattery {
                     BatteryView(battery: model.battery, showsPercentage: settings.showBatteryPercentage)
                 }
             }
         }
         .font(.system(size: 11, weight: .medium))
         .foregroundStyle(.white.opacity(0.55))
+        .lineLimit(1)
+        .fixedSize(horizontal: false, vertical: true)
         .padding(.horizontal, 30)
     }
 
     private var idleHint: String {
-        switch media.source {
+        if let bundleID = media.source.bundleIdentifiers.first, media.source == .spotify || media.source == .appleMusic,
+           !AppleScriptProvider.isAllowed(bundleID) {
+            return "Allow control of \(media.source.title) in Settings → Permissions."
+        }
+        return switch media.source {
         case .nowPlaying: "Play something in any app or browser."
         case .spotify: "Play something in Spotify."
         case .appleMusic: "Play something in Music."
@@ -110,73 +116,57 @@ struct ExpandedView: View {
     }
 }
 
-/// Tab buttons in the header: the app logo for Now Playing and a tray for the shelf.
-/// Glass mode shows the selected tab as a clear glass pill.
 private struct TabSwitcher: View {
     let model: NotchViewModel
+    /// The selection pill slides between tabs.
+    @Namespace private var pill
 
     private var glass: Bool { model.settings.appearance == .glass }
 
     var body: some View {
         HStack(spacing: glass ? 4 : 2) {
-            ForEach(model.tabs, id: \.self) { tab in
-                button(for: tab)
+            ForEach(model.pages) { page in
+                let isSelected = model.visiblePage == page
+                Button { model.select(page) } label: {
+                    Group {
+                        if page == .player {
+                            if glass || isSelected {
+                                AppLogo(height: glass ? 15 : 13, glass: glass,
+                                        highlight: isSelected ? 0.2 : 0, color: model.accentColor)
+                            } else {
+                                AppLogo(height: 13, glass: false).opacity(0.5)
+                            }
+                        } else {
+                            Image(systemName: page.icon)
+                                .font(.system(size: glass ? 11 : 10, weight: .semibold))
+                                .foregroundStyle(.white.opacity(isSelected ? 1 : 0.5))
+                        }
+                    }
+                    .frame(width: glass ? 34 : 26, height: glass ? 22 : 18)
+                    .background {
+                        if isSelected {
+                            Group {
+                                if glass {
+                                    Color.clear.notchGlass(true, in: Capsule())
+                                } else {
+                                    Capsule().fill(.white.opacity(0.18))
+                                }
+                            }
+                            .matchedGeometryEffect(id: "selection", in: pill)
+                        }
+                    }
+                    .contentShape(Capsule())
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel(page.title)
+                .animation(.easeOut(duration: 0.15), value: isSelected)
             }
         }
         .padding(glass ? 0 : 2)
         .background(Capsule().fill(.white.opacity(glass ? 0 : 0.08)))
     }
-
-    private func button(for tab: NotchTab) -> some View {
-        let isSelected = model.visibleTab == tab
-        return Button {
-            model.select(tab)
-        } label: {
-            icon(for: tab, isSelected: isSelected)
-                .frame(width: glass ? 34 : 26, height: glass ? 22 : 18)
-                .background {
-                    if glass {
-                        if isSelected {
-                            Color.clear.notchGlass(true, in: Capsule())
-                        }
-                    } else {
-                        Capsule().fill(.white.opacity(isSelected ? 0.18 : 0))
-                    }
-                }
-                .contentShape(Capsule())
-        }
-        .buttonStyle(.plain)
-        .accessibilityLabel(label(for: tab))
-        .animation(.easeOut(duration: 0.15), value: isSelected)
-    }
-
-    @ViewBuilder
-    private func icon(for tab: NotchTab, isSelected: Bool) -> some View {
-        switch tab {
-        case .nowPlaying:
-            AppLogo(height: glass ? 15 : 13, glass: glass, highlight: isSelected ? 0.2 : 0,
-                    color: model.accentColor)
-                .opacity(glass || isSelected ? 1 : 0.6)
-        case .shelf:
-            symbol(glass ? "tray.fill" : "tray.full", isSelected: isSelected)
-        }
-    }
-
-    private func symbol(_ name: String, isSelected: Bool) -> some View {
-        Image(systemName: name)
-            .font(.system(size: glass ? 11 : 10, weight: .semibold))
-            .foregroundStyle(.white.opacity(isSelected ? 1 : 0.5))
-    }
-
-    private func label(for tab: NotchTab) -> String {
-        switch tab {
-        case .nowPlaying: "Now Playing"
-        case .shelf: "Shelf"
-        }
-    }
 }
 
-/// Small icon button in the header row; bright while `isOn`.
 private struct HeaderButton: View {
     let symbol: String
     let label: String

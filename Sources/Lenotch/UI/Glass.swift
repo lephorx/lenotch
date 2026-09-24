@@ -38,8 +38,8 @@ struct GlassIcon<S: Shape>: View {
     }
 }
 
-/// Dark frosted glass card with a soft shadow. `isRaised` (hover or drop target)
-/// lightens it and deepens the shadow. The card never moves or scales, since
+/// Clear glass card with a soft shadow. `isRaised` (hover or drop target)
+/// brightens it slightly and deepens the shadow. The card never moves or scales, since
 /// transformed glass renders out of step with its outline.
 struct GlassCard<Content: View>: View {
     var cornerRadius: CGFloat = 26
@@ -53,8 +53,9 @@ struct GlassCard<Content: View>: View {
             .background {
                 ZStack {
                     OuterShadow(shape: shape, isRaised: isRaised)
-                    Color.clear.notchGlass(true, in: shape, style: .frosted,
-                                           tint: .black.opacity(isRaised ? 0.15 : 0.3))
+                    // Clear, untinted glass at half strength so the cards stay see-through.
+                    Color.clear.notchGlass(true, in: shape, tint: isRaised ? .white.opacity(0.06) : nil)
+                        .opacity(isRaised ? 0.7 : 0.5)
                 }
             }
             .animation(.easeOut(duration: 0.2), value: isRaised)

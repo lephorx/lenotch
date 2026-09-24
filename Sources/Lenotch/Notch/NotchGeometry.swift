@@ -7,9 +7,8 @@ struct NotchGeometry: Equatable {
     /// Horizontal centre of the notch in screen coordinates.
     let centerX: CGFloat
     let notchSize: CGSize
-
-    static let openWidth: CGFloat = 580
     static let openBodyHeight: CGFloat = 166
+    static let openWidth: CGFloat = 688
 
     init(screen: NSScreen) {
         screenFrame = screen.frame
@@ -33,12 +32,30 @@ struct NotchGeometry: Equatable {
         CGSize(width: notchSize.width + 2 * (notchSize.height + 12), height: notchSize.height)
     }
 
+    /// The card that drops out of the closed notch to show the current song.
+    var peekSize: CGSize {
+        CGSize(width: notchSize.width + 240, height: notchSize.height + 58)
+    }
+
+    /// The splash the notch grows into for the intro.
+    var introSize: CGSize {
+        CGSize(width: notchSize.width + 180, height: notchSize.height + 110)
+    }
+
+    /// Largest open size (the player and calendar tab); the window is sized for it.
     var openSize: CGSize {
-        CGSize(width: max(Self.openWidth, notchSize.width + 200),
+        CGSize(width: min(Self.openWidth, screenFrame.width - 24),
                height: notchSize.height + Self.openBodyHeight)
     }
 
-    /// The window always has the open size; the black shape animates inside it.
+    /// Open size for a tab whose content needs `contentWidth` × `bodyHeight`, kept wide
+    /// enough for the header (tabs and buttons either side of the notch) and within the largest size.
+    func openSize(contentWidth: CGFloat, bodyHeight: CGFloat) -> CGSize {
+        CGSize(width: min(max(contentWidth, notchSize.width + 340), openSize.width),
+               height: notchSize.height + min(bodyHeight, Self.openBodyHeight))
+    }
+
+    /// The window is sized for the widest page; the black shape animates inside it.
     var windowFrame: NSRect {
         let size = openSize
         let width = size.width + 2 * NotchShape.openTopRadius
@@ -50,9 +67,10 @@ struct NotchGeometry: Equatable {
     static let mirrorSize = CGSize(width: 164, height: 164)
     static let mirrorGap: CGFloat = 10
 
-    var mirrorWindowFrame: NSRect {
+    /// Beside an open notch of the given width.
+    func mirrorWindowFrame(openWidth: CGFloat) -> NSRect {
         let width = Self.mirrorSize.width + 2 * NotchShape.mirrorTopRadius
-        let x = centerX + openSize.width / 2 + NotchShape.openTopRadius + Self.mirrorGap
+        let x = centerX + openWidth / 2 + NotchShape.openTopRadius + Self.mirrorGap
         return NSRect(x: x, y: screenFrame.maxY - Self.mirrorSize.height,
                       width: width, height: Self.mirrorSize.height)
     }

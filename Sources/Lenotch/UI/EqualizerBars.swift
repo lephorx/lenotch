@@ -11,7 +11,8 @@ struct EqualizerBars: View {
     private static let phases: [Double] = [0, 1.7, 3.1, 0.8]
 
     var body: some View {
-        TimelineView(.animation(paused: !isPlaying)) { context in
+        // 30 fps is plenty for bars and far cheaper than the display's 120 Hz.
+        TimelineView(.animation(minimumInterval: 1 / 30, paused: !isPlaying)) { context in
             let time = context.date.timeIntervalSinceReferenceDate
             let real = levels.flatMap { $0.hasSignal ? $0.levels : nil }
             GeometryReader { proxy in

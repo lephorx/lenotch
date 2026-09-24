@@ -40,8 +40,10 @@ struct MirrorView: View {
                 .fill(.white.opacity(0.06))
             switch camera.status {
             case .running:
-                CameraPreview(previewLayer: camera.previewLayer, cornerRadius: Self.cornerRadius)
-                    .transition(.opacity)
+                if let layer = camera.previewLayer {
+                    CameraPreview(previewLayer: layer, cornerRadius: Self.cornerRadius)
+                        .transition(.opacity)
+                }
             case .idle:
                 ProgressView().controlSize(.small)
             case .denied:

@@ -50,7 +50,7 @@ enum AudioSource: String, CaseIterable, Identifiable {
     var appIcon: NSImage? {
         for id in bundleIdentifiers {
             if let url = NSWorkspace.shared.urlForApplication(withBundleIdentifier: id) {
-                return NSWorkspace.shared.icon(forFile: url.path)
+                return ImageDownsampling.icon(forFile: url.path, points: 36)
             }
         }
         return nil
