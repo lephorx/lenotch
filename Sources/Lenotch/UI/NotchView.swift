@@ -21,7 +21,10 @@ struct NotchView: View {
             .background {
                 NotchBackground(appearance: model.settings.appearance,
                                 gradient: model.backgroundGradient, isOpen: isExpanded,
-                                notchHeight: model.geometry.notchSize.height, shape: shape)
+                                notchHeight: model.geometry.notchSize.height, shape: shape,
+                                musicColor: isOpen && model.visiblePage == .player
+                                    && model.settings.showMusic && model.settings.gradient(for: model.settings.appearance).bottomFollowsMusic
+                                    ? model.accentColor : nil)
             }
             .clipShape(shape)
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
@@ -32,6 +35,7 @@ struct NotchView: View {
             .animation(.spring(response: 0.42, dampingFraction: 0.82), value: model.showsLiveActivity)
             .animation(.easeInOut(duration: 0.3), value: model.settings.appearance)
             .animation(.easeInOut(duration: 0.6), value: model.backgroundGradient)
+            .animation(.easeInOut(duration: 0.6), value: model.accentColor)
             .environment(\.colorScheme, .dark)
     }
 

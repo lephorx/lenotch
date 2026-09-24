@@ -43,7 +43,7 @@ struct NotchGradient: Codable, Equatable {
     var bottom: RGBAColor
     var start: Double
     var length: Double
-    /// Use the current song's artwork colour instead of `bottom` (keeping its opacity).
+    /// Add the current song's artwork colour as a localized glow and bottom rim.
     var bottomFollowsMusic = false
 
     init(top: RGBAColor, bottom: RGBAColor, start: Double, length: Double, bottomFollowsMusic: Bool = false) {
@@ -64,20 +64,14 @@ struct NotchGradient: Codable, Equatable {
         bottomFollowsMusic = try container.decodeIfPresent(Bool.self, forKey: .bottomFollowsMusic) ?? false
     }
 
-    /// This gradient with the bottom swapped for the music colour, if it follows the music.
-    func resolved(musicColor: Color?) -> NotchGradient {
-        guard bottomFollowsMusic, let musicColor else { return self }
-        var copy = self
-        var bottom = RGBAColor(musicColor)
-        bottom.alpha = self.bottom.alpha
-        copy.bottom = bottom
-        return copy
-    }
-
     /// Solid black, as before custom gradients existed.
-    static let blackDefault = NotchGradient(top: .black, bottom: .black, start: 0, length: 1)
+    static let blackDefault = NotchGradient(top: .black, bottom: .black, start: 0, length: 1,
+                                            bottomFollowsMusic: true)
     /// Black fading into fully clear glass, across the whole height.
-    static let glassDefault = NotchGradient(top: .black, bottom: .clear, start: 0, length: 1)
+    static let glassDefault = NotchGradient(top: .black, bottom: .clear, start: 0, length: 1,
+                                            bottomFollowsMusic: true)
+    static let legacyBlackDefault = NotchGradient(top: .black, bottom: .black, start: 0, length: 1)
+    static let legacyGlassDefault = NotchGradient(top: .black, bottom: .clear, start: 0, length: 1)
     /// The earlier 50% glass default; saved copies of it are upgraded to the current default.
     static let previousGlassDefault = NotchGradient(top: .black, bottom: RGBAColor(red: 0, green: 0, blue: 0, alpha: 0.5),
                                                     start: 0, length: 1)
