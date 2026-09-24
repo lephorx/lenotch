@@ -10,7 +10,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private let hotKeys = HotKeyCenter()
     /// Starting the audio tap is what makes macOS ask for audio recording; the
     /// visualizer timer stops it again right away if nothing is playing.
-    private lazy var permissions = PermissionCenter(settings: settings) { [weak self] in self?.visualizer.start() }
+    private lazy var permissions: PermissionCenter = {
+        let center = PermissionCenter(settings: settings) { [weak self] in self?.visualizer.start() }
+        // Keep Settings / the setup in front while macOS asks, then bring them back.
+        center.onPromptStarted = { [weak self] in self?.windows.setFloating(true) }
+        center.onPromptFinished = { [weak self] in self?.windows.setFloating(false) }
+        return center
+    }()
     private let windows = WindowPresenter()
     private var notch: NotchWindowController?
 

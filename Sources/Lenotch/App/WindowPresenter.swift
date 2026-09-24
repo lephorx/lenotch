@@ -37,6 +37,16 @@ final class WindowPresenter {
         bringToFront(window)
     }
 
+    /// Keeps every open window above other apps (or back to normal), e.g. around a
+    /// permission prompt; bringing them back to the front when released.
+    func setFloating(_ floating: Bool) {
+        for (id, window) in windows {
+            // The setup window always floats.
+            window.level = floating || id == "onboarding" ? .floating : .normal
+            if !floating { bringToFront(window) }
+        }
+    }
+
     func close(id: String) {
         windows[id]?.close()
     }

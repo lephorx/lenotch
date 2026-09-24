@@ -25,6 +25,10 @@ final class PermissionCenter {
 
     @ObservationIgnored private let settings: AppSettings
     @ObservationIgnored private let startAudioTap: () -> Void
+    /// Called when a macOS prompt is about to show and after it's answered, so the
+    /// window that asked can stay in front instead of falling behind other apps.
+    @ObservationIgnored var onPromptStarted: (() -> Void)?
+    @ObservationIgnored var onPromptFinished: (() -> Void)?
 
     let controllableApps: [ControllableApp] = [("com.spotify.client", "Spotify"), ("com.apple.Music", "Music")]
         .filter { NSWorkspace.shared.urlForApplication(withBundleIdentifier: $0.0) != nil }
@@ -56,28 +60,42 @@ final class PermissionCenter {
     // MARK: - Requests (only ever called from a user's click)
 
     func requestCalendar() {
+        onPromptStarted?()
         EKEventStore().requestFullAccessToEvents { _, _ in
-            DispatchQueue.main.async { self.refresh() }
+            DispatchQueue.main.async { self.finished() }
         }
     }
 
     func requestCamera() {
+        onPromptStarted?()
         AVCaptureDevice.requestAccess(for: .video) { _ in
-            DispatchQueue.main.async { self.refresh() }
+            DispatchQueue.main.async { self.finished() }
         }
     }
 
     /// Turns the real visualizer on; macOS asks the first time the audio tap starts.
+    /// There's no callback for that prompt, so the window is released after a while.
     func enableAudioVisualizer() {
+        onPromptStarted?()
         settings.realAudioVisualizer = true
         startAudioTap()
+        DispatchQueue.main.asyncAfter(deadline: .now() + 20) { self.onPromptFinished?() }
     }
 
     func requestAutomation(_ app: ControllableApp) {
+        onPromptStarted?()
         DispatchQueue.global(qos: .userInitiated).async {
             let status = Self.automationStatus(app.id, ask: true)
-            DispatchQueue.main.async { self.automation[app.id] = status }
+            DispatchQueue.main.async {
+                self.automation[app.id] = status
+                self.finished()
+            }
         }
+    }
+
+    private func finished() {
+        refresh()
+        onPromptFinished?()
     }
 
     func openPrivacySettings(_ pane: String) {
