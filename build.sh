@@ -24,6 +24,7 @@ BIN_DIR="$(swift build -c "$CONFIG" ${ARCH_FLAGS[@]+"${ARCH_FLAGS[@]}"} --show-b
 rm -rf "$APP"
 mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
 cp "$BIN_DIR/Lenotch" "$APP/Contents/MacOS/"
+install_name_tool -add_rpath @executable_path/../Frameworks "$APP/Contents/MacOS/Lenotch"
 cp Resources/Info.plist "$APP/Contents/"
 cp -R Vendor/MediaRemoteAdapter "$APP/Contents/Resources/"
 cp Resources/logo-white.png Resources/AppIcon.icns Resources/glyph-amp.svg "$APP/Contents/Resources/"
@@ -36,6 +37,15 @@ fi
 if [ -n "${BUILD:-}" ]; then
   /usr/libexec/PlistBuddy -c "Set :CFBundleVersion $BUILD" "$APP/Contents/Info.plist"
 fi
+SPARKLE_SOURCE=".build/artifacts/sparkle/Sparkle/Sparkle.xcframework/macos-arm64_x86_64/Sparkle.framework"
+SPARKLE_DEST="$APP/Contents/Frameworks/Sparkle.framework"
+mkdir -p "$APP/Contents/Frameworks"
+ditto "$SPARKLE_SOURCE" "$SPARKLE_DEST"
+# Lenotch is not sandboxed, so Sparkle's XPC services are unnecessary.
+rm -rf "$SPARKLE_DEST/Versions/B/XPCServices" "$SPARKLE_DEST/XPCServices"
+codesign --force --sign - "$SPARKLE_DEST/Versions/B/Autoupdate"
+codesign --force --sign - "$SPARKLE_DEST/Versions/B/Updater.app"
+codesign --force --sign - "$SPARKLE_DEST"
 codesign --force --sign - "$APP"
 
 echo "Built $APP"
@@ -97,7 +107,7 @@ case "${1:-}" in
     fi
     hdiutil detach "$MOUNT" -quiet
     rm -f "${DMG%.dmg}-compressed.dmg"
-    hdiutil convert "$DMG" -format UDZO -o "${DMG%.dmg}-compressed.dmg" -quiet
+    hdiutil convert "$DMG" -format UDBZ -o "${DMG%.dmg}-compressed.dmg" -quiet
     mv "${DMG%.dmg}-compressed.dmg" "$DMG"
     DMG_BYTES="$(stat -f '%z' "$DMG")"
     if [ "$DMG_BYTES" -ge 4000000 ]; then
