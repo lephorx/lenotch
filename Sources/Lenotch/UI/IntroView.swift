@@ -64,20 +64,22 @@ struct IntroView: View {
     }
 
     private func play() async {
-        try? await Task.sleep(for: .milliseconds(380))
+        // The view can disappear mid-replay; canceled sleeps must not advance
+        // its animation or close a newer intro.
+        guard (try? await Task.sleep(for: .milliseconds(380))) != nil else { return }
         withAnimation(.spring(response: 0.55, dampingFraction: 0.55)) { logoDropped = true }
-        try? await Task.sleep(for: .milliseconds(320))
+        guard (try? await Task.sleep(for: .milliseconds(320))) != nil else { return }
         NSHapticFeedbackManager.defaultPerformer.perform(.levelChange, performanceTime: .now)
         withAnimation(.easeOut(duration: 0.6)) { glowing = true }
-        try? await Task.sleep(for: .milliseconds(200))
+        guard (try? await Task.sleep(for: .milliseconds(200))) != nil else { return }
         withAnimation(.spring(response: 0.5, dampingFraction: 0.8)) { showTitle = true }
         withAnimation(.easeInOut(duration: 0.9).delay(0.25)) { shine = true }
-        try? await Task.sleep(for: .milliseconds(1600))
+        guard (try? await Task.sleep(for: .milliseconds(1600))) != nil else { return }
         withAnimation(.easeIn(duration: 0.3)) {
             leaving = true
             glowing = false
         }
-        try? await Task.sleep(for: .milliseconds(260))
+        guard (try? await Task.sleep(for: .milliseconds(260))) != nil else { return }
         onFinish()
     }
 }

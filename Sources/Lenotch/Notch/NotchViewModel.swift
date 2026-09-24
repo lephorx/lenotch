@@ -32,6 +32,8 @@ final class NotchViewModel {
     var state: State = .closed
     /// The first-launch intro is playing (the notch ignores the pointer meanwhile).
     var isShowingIntro = false
+    /// A fresh identity resets IntroView's animation state on every replay.
+    var introGeneration = UUID()
     /// Keeps the chosen appearance visible while the setup opacity slider is adjusted.
     var isShowingAppearancePreview = false
     /// Briefly showing the current song under the closed notch.
