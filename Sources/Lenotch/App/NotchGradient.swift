@@ -64,20 +64,25 @@ struct NotchGradient: Codable, Equatable {
         bottomFollowsMusic = try container.decodeIfPresent(Bool.self, forKey: .bottomFollowsMusic) ?? false
     }
 
-    /// This gradient with the bottom swapped for the music colour, if it follows the music.
+    /// This gradient with a subdued version of the music colour at the bottom.
     func resolved(musicColor: Color?) -> NotchGradient {
         guard bottomFollowsMusic, let musicColor else { return self }
         var copy = self
-        var bottom = RGBAColor(musicColor)
+        // A full-strength artwork accent makes the whole notch too bright.
+        var bottom = RGBAColor(musicColor).mixed(with: .black, 0.72)
         bottom.alpha = self.bottom.alpha
         copy.bottom = bottom
         return copy
     }
 
     /// Solid black, as before custom gradients existed.
-    static let blackDefault = NotchGradient(top: .black, bottom: .black, start: 0, length: 1)
+    static let blackDefault = NotchGradient(top: .black, bottom: .black, start: 0, length: 1,
+                                            bottomFollowsMusic: true)
     /// Black fading into fully clear glass, across the whole height.
-    static let glassDefault = NotchGradient(top: .black, bottom: .clear, start: 0, length: 1)
+    static let glassDefault = NotchGradient(top: .black, bottom: .clear, start: 0, length: 1,
+                                            bottomFollowsMusic: true)
+    static let legacyBlackDefault = NotchGradient(top: .black, bottom: .black, start: 0, length: 1)
+    static let legacyGlassDefault = NotchGradient(top: .black, bottom: .clear, start: 0, length: 1)
     /// The earlier 50% glass default; saved copies of it are upgraded to the current default.
     static let previousGlassDefault = NotchGradient(top: .black, bottom: RGBAColor(red: 0, green: 0, blue: 0, alpha: 0.5),
                                                     start: 0, length: 1)

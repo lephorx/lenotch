@@ -9,6 +9,7 @@ struct NotchBackground: View {
     let isOpen: Bool
     let notchHeight: CGFloat
     let shape: NotchShape
+    var artwork: NSImage? = nil
 
     var body: some View {
         GeometryReader { proxy in
@@ -19,6 +20,23 @@ struct NotchBackground: View {
                 }
                 LinearGradient(stops: gradient.stops(solidFraction: solidFraction),
                                startPoint: .top, endPoint: .bottom)
+                if let artwork, isOpen {
+                    Image(nsImage: artwork)
+                        .resizable()
+                        .scaledToFill()
+                        .frame(width: proxy.size.width, height: proxy.size.height)
+                        .blur(radius: 42)
+                        .opacity(appearance == .glass
+                                 ? 0.08 + 0.20 * gradient.bottom.alpha : 0.27)
+                        .mask {
+                            LinearGradient(stops: [
+                                .init(color: .clear, location: 0),
+                                .init(color: .clear, location: solidFraction),
+                                .init(color: .white, location: min(solidFraction + 0.3, 1)),
+                                .init(color: .white, location: 1)
+                            ], startPoint: .top, endPoint: .bottom)
+                        }
+                }
                 Color.black.opacity(isOpen ? 0 : 1)
             }
         }

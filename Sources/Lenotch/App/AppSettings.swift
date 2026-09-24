@@ -196,9 +196,23 @@ final class AppSettings {
         func gradient(_ key: String, _ fallback: NotchGradient) -> NotchGradient {
             defaults.data(forKey: key).flatMap { try? JSONDecoder().decode(NotchGradient.self, from: $0) } ?? fallback
         }
-        blackGradient = gradient("blackGradient", .blackDefault)
+        // Bring unchanged old gradients onto the new album-art background once.
+        // Custom gradients, and choices made after this migration, stay untouched.
+        let upgradeArtworkBackground = defaults.integer(forKey: "artworkBackgroundVersion") < 1
+        let savedBlack = gradient("blackGradient", .blackDefault)
+        let upgradedBlack: NotchGradient = upgradeArtworkBackground && savedBlack == .legacyBlackDefault
+            ? .blackDefault : savedBlack
+        blackGradient = upgradedBlack
         let savedGlass = gradient("glassGradient", .glassDefault)
-        glassGradient = savedGlass == .previousGlassDefault ? .glassDefault : savedGlass
+        let upgradedGlass: NotchGradient = (savedGlass == .previousGlassDefault
+                                            || upgradeArtworkBackground && savedGlass == .legacyGlassDefault)
+            ? .glassDefault : savedGlass
+        glassGradient = upgradedGlass
+        if upgradeArtworkBackground {
+            defaults.set(try? JSONEncoder().encode(upgradedBlack), forKey: "blackGradient")
+            defaults.set(try? JSONEncoder().encode(upgradedGlass), forKey: "glassGradient")
+            defaults.set(1, forKey: "artworkBackgroundVersion")
+        }
         tintEqualizer = bool("tintEqualizer", true)
         tintProgressBar = bool("tintProgressBar", true)
         audioSource = defaults.string(forKey: "audioSource").flatMap(AudioSource.init) ?? .nowPlaying

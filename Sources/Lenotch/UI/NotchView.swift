@@ -21,7 +21,10 @@ struct NotchView: View {
             .background {
                 NotchBackground(appearance: model.settings.appearance,
                                 gradient: model.backgroundGradient, isOpen: isExpanded,
-                                notchHeight: model.geometry.notchSize.height, shape: shape)
+                                notchHeight: model.geometry.notchSize.height, shape: shape,
+                                artwork: isOpen && model.visiblePage == .player
+                                    && model.settings.showMusic && model.settings.gradient(for: model.settings.appearance).bottomFollowsMusic
+                                    ? model.media.artwork : nil)
             }
             .clipShape(shape)
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)

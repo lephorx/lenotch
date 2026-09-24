@@ -418,13 +418,13 @@ private struct MusicSettings: View {
                     Text("Buttons only appear when the player supports them. Favorite works with Apple Music.")
                 }
                 Section {
-                    Toggle("Notch colour", isOn: notchFollowsMusic)
+                    Toggle("Notch background", isOn: notchFollowsMusic)
                     Toggle("Equalizer bars", isOn: $settings.tintEqualizer)
                     Toggle("Progress bar", isOn: $settings.tintProgressBar)
                 } header: {
                     Text("Colours from the album art")
                 } footer: {
-                    Text("Takes the main colour of the current cover. Notch colour fades the bottom of the notch into it (\(settings.appearance.title) style).")
+                    Text("Uses the current cover for a soft, dark colour glow behind the music (\(settings.appearance.title) style).")
                 }
                 Section {
                     // Turning it on starts the audio tap, which is what makes macOS ask.
