@@ -26,6 +26,9 @@ rm -rf "$APP"
 mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
 cp "$BIN_DIR/Lenotch" "$APP/Contents/MacOS/"
 install_name_tool -add_rpath @executable_path/../Frameworks "$APP/Contents/MacOS/Lenotch"
+# SwiftPM leaves local symbols in release binaries. Remove them before signing
+# so the universal installer stays below the 4 MB download limit.
+xcrun strip -x "$APP/Contents/MacOS/Lenotch"
 cp Resources/Info.plist "$APP/Contents/"
 cp -R Vendor/MediaRemoteAdapter "$APP/Contents/Resources/"
 cp Resources/logo-white.png Resources/AppIcon.icns Resources/glyph-amp.svg "$APP/Contents/Resources/"
