@@ -45,6 +45,7 @@ final class NotchViewModel {
     let visualizer: AudioVisualizer
     let camera = CameraMirror()
     let calendar: CalendarService
+    let weather: WeatherService
     let aiUsage = AIUsageService()
     /// The AI usage ring under the pointer, for the bubble below the notch.
     private(set) var usageHover: UsageHover?
@@ -69,6 +70,7 @@ final class NotchViewModel {
         self.media = media
         self.settings = settings
         self.calendar = CalendarService(settings: settings)
+        self.weather = WeatherService(settings: settings)
         self.battery = battery
         self.shelf = shelf
         self.visualizer = visualizer
@@ -126,8 +128,14 @@ final class NotchViewModel {
     func openSize(for page: NotchPage) -> CGSize {
         switch page {
         case .player:
-            // Music alone is narrower than music with the calendar beside it.
-            return showsCalendar ? geometry.openSize : geometry.openSize(contentWidth: 460, bodyHeight: 166)
+            switch (settings.showMusic, showsCalendar) {
+            case (true, true): return geometry.openSize
+            case (true, false): return geometry.openSize(contentWidth: 460, bodyHeight: 166)
+            // The calendar alone stretches across a mid-sized tab.
+            case (false, true): return geometry.openSize(contentWidth: 580, bodyHeight: 166)
+            // Neither: logo, name, time and the weather.
+            case (false, false): return geometry.openSize(contentWidth: 540, bodyHeight: 150)
+            }
         case .shelf:
             return geometry.openSize(contentWidth: 500, bodyHeight: 150)
         case .aiUsage:

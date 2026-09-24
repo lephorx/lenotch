@@ -63,6 +63,13 @@ final class AppSettings {
     var showMenuBarIcon: Bool { didSet { save(showMenuBarIcon, "showMenuBarIcon") } }
     /// Show the calendar next to the music (it also needs calendar permission).
     var showCalendar: Bool { didSet { save(showCalendar, "showCalendar") } }
+    /// The music player in the first tab; off leaves the calendar (or the weather home view).
+    var showMusic: Bool { didSet { save(showMusic, "showMusic") } }
+    /// Place for the weather in the home view (a typed city or the user's location).
+    var weatherPlace: WeatherPlace? {
+        didSet { defaults.set(weatherPlace.flatMap { try? JSONEncoder().encode($0) }, forKey: "weatherPlace") }
+    }
+    var weatherFahrenheit: Bool { didSet { save(weatherFahrenheit, "weatherFahrenheit") } }
     /// Reminders under the day's events (also needs reminders permission).
     var showReminders: Bool { didSet { save(showReminders, "showReminders") } }
     /// The camera mirror button in the notch (also needs camera permission).
@@ -148,6 +155,9 @@ final class AppSettings {
         showBatteryPercentage = bool("showBatteryPercentage", true)
         showMenuBarIcon = bool("showMenuBarIcon", true)
         showCalendar = bool("showCalendar", true)
+        showMusic = bool("showMusic", true)
+        weatherPlace = defaults.data(forKey: "weatherPlace").flatMap { try? JSONDecoder().decode(WeatherPlace.self, from: $0) }
+        weatherFahrenheit = bool("weatherFahrenheit", Locale.current.measurementSystem == .us)
         showReminders = bool("showReminders", true)
         showMirror = bool("showMirror", true)
         autoScrollCalendar = bool("autoScrollCalendar", true)

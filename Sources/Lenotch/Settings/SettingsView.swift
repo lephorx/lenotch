@@ -126,6 +126,7 @@ private struct GeneralSettings: View {
     var body: some View {
         Form {
             Section {
+                Toggle("Music player", isOn: $settings.showMusic)
                 permissions.toggle("Calendar next to the music", isEnabled: $settings.showCalendar, calendar: .events)
                 permissions.cameraToggle("Camera mirror button", isEnabled: $settings.showMirror)
                 Toggle("AirDrop on the shelf", isOn: $settings.showAirDrop)
@@ -134,6 +135,7 @@ private struct GeneralSettings: View {
             } footer: {
                 Text("Features that need a permission turn on only once it's allowed; switching one on asks macOS.")
             }
+            WeatherSection(settings: settings)
             Section("Opening") {
                 Picker("Open the notch on", selection: $settings.openMode) {
                     ForEach(OpenMode.allCases) { Text($0.title).tag($0) }

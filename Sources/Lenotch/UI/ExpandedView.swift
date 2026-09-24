@@ -36,19 +36,27 @@ struct ExpandedView: View {
     private var pageContent: some View {
         switch model.visiblePage {
         case .player:
-            HStack(alignment: .top, spacing: 28) {
-                Group {
-                    if let track = media.track {
-                        NowPlayingView(model: model, track: track)
-                    } else {
-                        idle.slideIn(0)
+            if settings.showMusic {
+                HStack(alignment: .top, spacing: 28) {
+                    Group {
+                        if let track = media.track {
+                            NowPlayingView(model: model, track: track)
+                        } else {
+                            idle.slideIn(0)
+                        }
+                    }
+                    .frame(width: 400)
+                    if model.showsCalendar {
+                        CalendarPanel(model: model, width: 200)
+                            .slideIn(4)
                     }
                 }
-                .frame(width: 400)
-                if model.showsCalendar {
-                    CalendarPanel(model: model, width: 200)
-                        .slideIn(4)
-                }
+            } else if model.showsCalendar {
+                // Without music the calendar takes the whole tab.
+                CalendarPanel(model: model, width: model.openWidth - 60)
+                    .slideIn(0)
+            } else {
+                HomeView(model: model)
             }
         case .shelf:
             ShelfView(model: model, isDropTargeted: isDropTargeted)
