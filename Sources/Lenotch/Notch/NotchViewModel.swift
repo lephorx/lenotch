@@ -153,10 +153,17 @@ final class NotchViewModel {
     /// Switches pages with a slide in the matching direction.
     func select(_ page: NotchPage) {
         guard page != visiblePage else { return }
+        // Set the direction first and switch on the next run-loop turn, so the
+        // outgoing page already knows which way to leave.
         pageMovesForward = page.rawValue > visiblePage.rawValue
-        withAnimation(.spring(response: 0.42, dampingFraction: 0.84)) { selectedPage = page }
-        onOpenSizeChange?()
+        DispatchQueue.main.async {
+            // One spring for the content, the selection pill and the notch's resize.
+            withAnimation(Self.pageSpring) { self.selectedPage = page }
+            self.onOpenSizeChange?()
+        }
     }
+
+    static let pageSpring = Animation.spring(response: 0.46, dampingFraction: 0.86)
 
     /// Moves to the next (+1) or previous (-1) page; used by swipes.
     func selectPage(offset: Int) {

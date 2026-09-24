@@ -14,9 +14,7 @@ struct ExpandedView: View {
                 .frame(height: model.geometry.notchSize.height)
             pageContent
                 .id(model.visiblePage)
-                .transition(.push(from: model.pageMovesForward ? .trailing : .leading)
-                    .combined(with: .opacity)
-                    .combined(with: .blurReplace))
+                .transition(.page(forward: model.pageMovesForward))
                 .padding(.horizontal, 30)
                 .padding(.bottom, 20)
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -159,7 +157,6 @@ private struct TabSwitcher: View {
                 }
                 .buttonStyle(.plain)
                 .accessibilityLabel(page.title)
-                .animation(.easeOut(duration: 0.15), value: isSelected)
             }
         }
         .padding(glass ? 0 : 2)
@@ -187,5 +184,36 @@ private struct HeaderButton: View {
         .onHover { isHovered = $0 }
         .animation(.easeOut(duration: 0.15), value: isHovered)
         .animation(.easeOut(duration: 0.15), value: isOn)
+    }
+}
+
+// MARK: - Page transition
+
+extension AnyTransition {
+    /// Switching tabs: the old page glides a short way out and the new one in from
+    /// the other side, with a fade, a soft blur and a slight scale. Short travel
+    /// keeps it light; the pages never cross the whole notch.
+    static func page(forward: Bool) -> AnyTransition {
+        let travel: CGFloat = 48
+        return .asymmetric(
+            insertion: .modifier(active: PageMotion(offset: forward ? travel : -travel), identity: .identity),
+            removal: .modifier(active: PageMotion(offset: forward ? -travel : travel), identity: .identity))
+    }
+}
+
+private struct PageMotion: ViewModifier {
+    var offset: CGFloat
+    var blur: CGFloat = 6
+    var scale: CGFloat = 0.96
+    var opacity: Double = 0
+
+    static let identity = PageMotion(offset: 0, blur: 0, scale: 1, opacity: 1)
+
+    func body(content: Content) -> some View {
+        content
+            .offset(x: offset)
+            .scaleEffect(scale)
+            .blur(radius: blur)
+            .opacity(opacity)
     }
 }
