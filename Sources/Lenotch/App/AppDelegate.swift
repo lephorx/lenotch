@@ -90,7 +90,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                          updater: updater,
                          showOnboarding: { [weak self] in self?.showOnboarding() },
                          playIntro: { [weak self] in self?.playIntro() })
-                .lenotchWindowStyle(settings)
         }
     }
 
@@ -114,7 +113,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                     DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { self.playIntro() }
                 }
             }
-            .lenotchWindowStyle(settings)
         }
     }
 }
