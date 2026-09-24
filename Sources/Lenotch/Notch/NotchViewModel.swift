@@ -141,7 +141,11 @@ final class NotchViewModel {
             case (true, true): return geometry.openSize
             case (true, false): return geometry.openSize(contentWidth: 460, bodyHeight: 166)
             // The calendar alone stretches across a mid-sized tab.
-            case (false, true): return geometry.openSize(contentWidth: 600, bodyHeight: NotchGeometry.maxBodyHeight)
+            case (false, true):
+                // The month grid needs the taller tab; the day strip keeps the usual height.
+                return settings.expandedCalendarStyle == .month
+                    ? geometry.openSize(contentWidth: 600, bodyHeight: NotchGeometry.maxBodyHeight)
+                    : geometry.openSize(contentWidth: 580, bodyHeight: 166)
             // Neither: logo, name, time and the weather.
             case (false, false): return geometry.openSize(contentWidth: 540, bodyHeight: 150)
             }

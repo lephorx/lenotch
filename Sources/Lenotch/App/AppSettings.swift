@@ -22,6 +22,20 @@ enum Appearance: String, CaseIterable, Identifiable {
     }
 }
 
+/// How the calendar looks when it has the first tab to itself (music off).
+enum ExpandedCalendarStyle: String, CaseIterable, Identifiable {
+    case month, strip
+
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .month: "Month view"
+        case .strip: "Day strip"
+        }
+    }
+}
+
 enum OpenMode: String, CaseIterable, Identifiable {
     case hover
     case click
@@ -65,6 +79,9 @@ final class AppSettings {
     var showCalendar: Bool { didSet { save(showCalendar, "showCalendar") } }
     /// The music player in the first tab; off leaves the calendar (or the weather home view).
     var showMusic: Bool { didSet { save(showMusic, "showMusic") } }
+    var expandedCalendarStyle: ExpandedCalendarStyle {
+        didSet { save(expandedCalendarStyle.rawValue, "expandedCalendarStyle") }
+    }
     /// Place for the weather in the home view (a typed city or the user's location).
     var weatherPlace: WeatherPlace? {
         didSet { defaults.set(weatherPlace.flatMap { try? JSONEncoder().encode($0) }, forKey: "weatherPlace") }
@@ -165,6 +182,8 @@ final class AppSettings {
         showMenuBarIcon = bool("showMenuBarIcon", true)
         showCalendar = bool("showCalendar", true)
         showMusic = bool("showMusic", true)
+        expandedCalendarStyle = defaults.string(forKey: "expandedCalendarStyle")
+            .flatMap(ExpandedCalendarStyle.init) ?? .month
         weatherPlace = defaults.data(forKey: "weatherPlace").flatMap { try? JSONDecoder().decode(WeatherPlace.self, from: $0) }
         weatherFahrenheit = bool("weatherFahrenheit", Locale.current.measurementSystem == .us)
         showReminders = bool("showReminders", true)

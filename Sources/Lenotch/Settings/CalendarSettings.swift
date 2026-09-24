@@ -20,8 +20,22 @@ struct CalendarSettings: View {
 
     var body: some View {
         Form {
+            Section {
+                permissions.toggle("Show the calendar", isEnabled: $settings.showCalendar, calendar: .events)
+            } footer: {
+                Text("Your events next to the music. Switching it on asks for calendar access.")
+            }
+            Section {
+                Picker("Layout", selection: $settings.expandedCalendarStyle) {
+                    ForEach(ExpandedCalendarStyle.allCases) { Text($0.title).tag($0) }
+                }
+                .pickerStyle(.segmented)
+            } header: {
+                Text("Big calendar")
+            } footer: {
+                Text("When the music player is off, the calendar fills the tab: a month grid with the day's events beside it, or the scrolling day strip.")
+            }
             Section("Events") {
-                permissions.toggle("Show calendar next to music", isEnabled: $settings.showCalendar, calendar: .events)
                 permissions.toggle("Show reminders", isEnabled: $settings.showReminders, calendar: .reminders)
                 Toggle("Auto scroll to next event", isOn: $settings.autoScrollCalendar)
                 Toggle("Always show full event titles", isOn: $settings.showFullEventTitles)

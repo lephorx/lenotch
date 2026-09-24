@@ -2,20 +2,37 @@ import ServiceManagement
 import Sparkle
 import SwiftUI
 
-/// Settings sections, listed in the sidebar.
+/// Settings pages, grouped in the sidebar by what you want to change: how the notch
+/// behaves and looks, each feature with its own page, and privacy.
 enum SettingsSection: String, CaseIterable, Identifiable {
-    case general, appearance, media, calendar, aiUsage, shelf, permissions
+    case general, look, music, calendar, weather, shelf, camera, aiUsage, permissions
+
+    enum Group: String, CaseIterable {
+        case notch = "Notch"
+        case features = "Features"
+        case privacy = "Privacy"
+    }
 
     var id: String { rawValue }
+
+    var group: Group {
+        switch self {
+        case .general, .look: .notch
+        case .permissions: .privacy
+        default: .features
+        }
+    }
 
     var title: String {
         switch self {
         case .general: "General"
-        case .appearance: "Appearance"
-        case .media: "Media"
+        case .look: "Look"
+        case .music: "Music"
         case .calendar: "Calendar"
-        case .aiUsage: "AI Usage"
+        case .weather: "Weather"
         case .shelf: "Shelf"
+        case .camera: "Camera"
+        case .aiUsage: "AI Usage"
         case .permissions: "Permissions"
         }
     }
@@ -23,11 +40,13 @@ enum SettingsSection: String, CaseIterable, Identifiable {
     var symbol: String {
         switch self {
         case .general: "gearshape.fill"
-        case .appearance: "paintbrush.fill"
-        case .media: "music.note"
+        case .look: "paintbrush.fill"
+        case .music: "music.note"
         case .calendar: "calendar"
-        case .aiUsage: "sparkles"
+        case .weather: "cloud.sun.fill"
         case .shelf: "tray.full.fill"
+        case .camera: "camera.fill"
+        case .aiUsage: "sparkles"
         case .permissions: "hand.raised.fill"
         }
     }
@@ -36,13 +55,40 @@ enum SettingsSection: String, CaseIterable, Identifiable {
     var tint: Color {
         switch self {
         case .general: .gray
-        case .appearance: .indigo
-        case .media: .pink
-        case .calendar: .blue
-        case .aiUsage: .orange
+        case .look: .indigo
+        case .music: .pink
+        case .calendar: .red
+        case .weather: .cyan
         case .shelf: .blue
+        case .camera: .teal
+        case .aiUsage: .orange
         case .permissions: .green
         }
+    }
+
+    /// Words people might search for to find this page.
+    var keywords: [String] {
+        switch self {
+        case .general: ["open", "hover", "click", "delay", "shortcut", "keyboard", "menu bar", "icon", "login",
+                        "startup", "update", "welcome", "intro", "peek"]
+        case .look: ["style", "black", "glass", "liquid", "opacity", "transparent", "colour", "color", "gradient",
+                     "fade", "battery", "percentage", "look", "appearance", "theme"]
+        case .music: ["music", "song", "player", "spotify", "apple music", "youtube", "source", "shuffle", "repeat",
+                      "favorite", "like", "album", "art", "cover", "colour", "color", "equalizer", "bars",
+                      "progress", "visualizer", "audio", "sound"]
+        case .calendar: ["calendar", "events", "month", "day strip", "reminders", "schedule", "date"]
+        case .weather: ["weather", "temperature", "city", "location", "celsius", "fahrenheit", "forecast"]
+        case .shelf: ["shelf", "files", "drop", "drag", "airdrop", "share"]
+        case .camera: ["camera", "mirror", "video", "face"]
+        case .aiUsage: ["ai", "usage", "claude", "codex", "cursor", "copilot", "limits", "provider", "tokens"]
+        case .permissions: ["permission", "privacy", "allow", "access", "security"]
+        }
+    }
+
+    func matches(_ query: String) -> Bool {
+        let text = query.trimmingCharacters(in: .whitespaces).lowercased()
+        guard !text.isEmpty else { return true }
+        return title.lowercased().contains(text) || keywords.contains { $0.contains(text) }
     }
 }
 
@@ -54,23 +100,44 @@ struct SettingsView: View {
     let showOnboarding: () -> Void
     let playIntro: () -> Void
 
-    @State private var section: SettingsSection? = .general
+    /// Page shown when the window opens (debug hooks can pick another).
+    static var initialSection: SettingsSection = .general
+    @State private var section: SettingsSection? = SettingsView.initialSection
+    @State private var query = ""
 
     var body: some View {
         NavigationSplitView {
-            List(SettingsSection.allCases, selection: $section) { section in
-                Label {
-                    Text(section.title)
-                } icon: {
-                    Image(systemName: section.symbol)
-                        .font(.system(size: 11, weight: .semibold))
-                        .foregroundStyle(.white)
-                        .frame(width: 22, height: 22)
-                        .background(RoundedRectangle(cornerRadius: 6, style: .continuous).fill(section.tint.gradient))
+            List(selection: $section) {
+                ForEach(SettingsSection.Group.allCases, id: \.self) { group in
+                    let pages = SettingsSection.allCases.filter { $0.group == group && $0.matches(query) }
+                    if !pages.isEmpty {
+                        Section(group.rawValue) {
+                            ForEach(pages) { page in
+                                Label {
+                                    Text(page.title)
+                                } icon: {
+                                    Image(systemName: page.symbol)
+                                        .font(.system(size: 11, weight: .semibold))
+                                        .foregroundStyle(.white)
+                                        .frame(width: 22, height: 22)
+                                        .background(RoundedRectangle(cornerRadius: 6, style: .continuous)
+                                            .fill(page.tint.gradient))
+                                }
+                                .tag(page)
+                            }
+                        }
+                    }
                 }
-                .tag(section)
             }
-            .navigationSplitViewColumnWidth(190)
+            .searchable(text: $query, placement: .sidebar, prompt: "Search settings")
+            // Jump to the first page that matches what's typed.
+            .onChange(of: query) { _, text in
+                if let first = SettingsSection.allCases.first(where: { $0.matches(text) }),
+                   !(section?.matches(text) ?? false) {
+                    section = first
+                }
+            }
+            .navigationSplitViewColumnWidth(200)
         } detail: {
             detail
                 .navigationTitle(section?.title ?? "Settings")
@@ -80,25 +147,35 @@ struct SettingsView: View {
                     permissions.refresh()
                 }
         }
-        .frame(width: 780, height: 580)
+        .frame(width: 800, height: 600)
     }
 
     @ViewBuilder
     private var detail: some View {
         switch section ?? .general {
         case .general:
-            GeneralSettings(settings: settings, permissions: permissions, updater: updater,
-                            showOnboarding: showOnboarding, playIntro: playIntro)
-        case .appearance:
-            AppearanceSettings(settings: settings)
-        case .media:
-            MediaSettings(settings: settings, permissions: permissions)
+            GeneralSettings(settings: settings, updater: updater, showOnboarding: showOnboarding, playIntro: playIntro)
+        case .look:
+            LookSettings(settings: settings)
+        case .music:
+            MusicSettings(settings: settings, permissions: permissions)
         case .calendar:
             CalendarSettings(settings: settings, permissions: permissions)
-        case .aiUsage:
-            AIUsageSettings(settings: settings)
+        case .weather:
+            Form { WeatherSection(settings: settings) }.formStyle(.grouped)
         case .shelf:
             ShelfSettings(settings: settings, shelf: shelf)
+        case .camera:
+            Form {
+                Section {
+                    permissions.cameraToggle("Camera mirror button", isEnabled: $settings.showMirror)
+                } footer: {
+                    Text("A camera button in the notch drops a small mirror down beside it. The camera only runs while the mirror is showing.")
+                }
+            }
+            .formStyle(.grouped)
+        case .aiUsage:
+            AIUsageSettings(settings: settings)
         case .permissions:
             Form {
                 Section {
@@ -112,11 +189,11 @@ struct SettingsView: View {
     }
 }
 
-// MARK: - Tabs
+// MARK: - Notch
 
+/// How the notch opens, shortcuts, the menu bar icon, startup and help.
 private struct GeneralSettings: View {
     @Bindable var settings: AppSettings
-    let permissions: PermissionCenter
     let updater: SPUUpdater
     let showOnboarding: () -> Void
     let playIntro: () -> Void
@@ -125,17 +202,6 @@ private struct GeneralSettings: View {
 
     var body: some View {
         Form {
-            Section {
-                Toggle("Music player", isOn: $settings.showMusic)
-                permissions.toggle("Calendar next to the music", isEnabled: $settings.showCalendar, calendar: .events)
-                permissions.cameraToggle("Camera mirror button", isEnabled: $settings.showMirror)
-                ShelfTabToggle(settings: settings)
-            } header: {
-                Text("Features")
-            } footer: {
-                Text("Features that need a permission turn on only once it's allowed; switching one on asks macOS.")
-            }
-            WeatherSection(settings: settings)
             Section("Opening") {
                 Picker("Open the notch on", selection: $settings.openMode) {
                     ForEach(OpenMode.allCases) { Text($0.title).tag($0) }
@@ -153,11 +219,6 @@ private struct GeneralSettings: View {
                 }
             }
             Section {
-                Toggle("Show battery percentage", isOn: $settings.showBatteryPercentage)
-            } header: {
-                Text("Battery")
-            }
-            Section {
                 LabeledContent("Open or close the notch") {
                     ShortcutRecorder(shortcut: $settings.toggleShortcut, defaultShortcut: .toggleDefault)
                 }
@@ -167,7 +228,7 @@ private struct GeneralSettings: View {
             } header: {
                 Text("Keyboard shortcuts")
             } footer: {
-                Text("Work in any app. Peek shows the song and artist under the notch for a few seconds, and does nothing when nothing is playing.")
+                Text("Work in any app. Swipe up on the open notch to close it.")
             }
             Section {
                 Toggle("Show icon in the menu bar", isOn: $settings.showMenuBarIcon)
@@ -176,12 +237,14 @@ private struct GeneralSettings: View {
             } footer: {
                 Text("When hidden, open Settings with the gear in the notch, or by opening Lenotch again from Applications or Spotlight.")
             }
-            Section("App") {
+            Section("Startup & updates") {
                 Toggle("Launch at login", isOn: $launchAtLogin)
                 Toggle("Check for updates automatically", isOn: Binding(
                     get: { updater.automaticallyChecksForUpdates },
                     set: { updater.automaticallyChecksForUpdates = $0 }
                 ))
+            }
+            Section("Help") {
                 LabeledContent("Welcome screen") {
                     Button("Show Again…", action: showOnboarding)
                 }
@@ -206,7 +269,8 @@ private struct GeneralSettings: View {
     }
 }
 
-private struct AppearanceSettings: View {
+/// Everything about how the notch looks: style, glass opacity, colours, the header.
+private struct LookSettings: View {
     @Bindable var settings: AppSettings
 
     var body: some View {
@@ -215,14 +279,27 @@ private struct AppearanceSettings: View {
                 AppearancePicker(settings: settings)
                     .padding(.vertical, 4)
             }
+            if settings.appearance == .glass {
+                Section {
+                    LabeledContent("Opacity") {
+                        HStack {
+                            Text("Clear").font(.system(size: 11)).foregroundStyle(.secondary)
+                            Slider(value: $settings.glassGradient.bottom.alpha, in: 0...1)
+                            Text("Dark").font(.system(size: 11)).foregroundStyle(.secondary)
+                            Text(settings.glassGradient.bottom.alpha, format: .percent.precision(.fractionLength(0)))
+                                .monospacedDigit()
+                                .frame(width: 40, alignment: .trailing)
+                        }
+                    }
+                } header: {
+                    Text("Liquid Glass")
+                } footer: {
+                    Text("How much the glass darkens towards the bottom. Higher is easier to read over bright or busy backgrounds.")
+                }
+            }
             GradientSettings(settings: settings, appearance: settings.appearance)
-            Section {
-                Toggle("Equalizer bars", isOn: $settings.tintEqualizer)
-                Toggle("Progress bar", isOn: $settings.tintProgressBar)
-            } header: {
-                Text("Album art colours")
-            } footer: {
-                Text("Tints these with the main colour of the current cover.")
+            Section("Notch header") {
+                Toggle("Show battery percentage", isOn: $settings.showBatteryPercentage)
             }
         }
         .formStyle(.grouped)
@@ -249,15 +326,8 @@ private struct GradientSettings: View {
     var body: some View {
         Section {
             ColorPicker("Top colour", selection: color(\.top), supportsOpacity: false)
-            Toggle("Match the song's colour", isOn: gradient.bottomFollowsMusic)
             ColorPicker(gradient.wrappedValue.bottomFollowsMusic ? "Bottom colour when nothing plays" : "Bottom colour",
                         selection: color(\.bottom), supportsOpacity: false)
-            if appearance == .glass {
-                LabeledContent("Bottom opacity") {
-                    percentSlider(Binding(get: { gradient.wrappedValue.bottom.alpha },
-                                          set: { gradient.wrappedValue.bottom.alpha = $0 }))
-                }
-            }
             LabeledContent("Transition starts") {
                 percentSlider(gradient.start)
             }
@@ -269,11 +339,11 @@ private struct GradientSettings: View {
                     .disabled(gradient.wrappedValue == .default(for: appearance))
             }
         } header: {
-            Text("Colour transition · \(appearance.title)")
+            Text("Colours")
         } footer: {
-            Text(appearance == .glass
-                 ? "Fades from the top colour into the bottom colour over the glass. Lower the bottom opacity to see more glass."
-                 : "Fades from the top colour into the bottom colour. The strip beside the hardware notch always uses the top colour.")
+            Text(gradient.wrappedValue.bottomFollowsMusic
+                 ? "The notch fades from the top colour into the song's colour (Music → Colours from the album art)."
+                 : "The notch fades from the top colour into the bottom colour. The strip beside the hardware notch always uses the top colour.")
         }
     }
 
@@ -300,42 +370,76 @@ private struct GradientSettings: View {
     }
 }
 
-private struct MediaSettings: View {
+// MARK: - Features
+
+/// The music player: on/off, where it reads from, its controls, colours taken from
+/// the album art, and the visualizer.
+private struct MusicSettings: View {
     @Bindable var settings: AppSettings
     let permissions: PermissionCenter
+
+    /// "Match the song's colour" belongs to the current style's colours.
+    private var notchFollowsMusic: Binding<Bool> {
+        Binding(
+            get: { settings.gradient(for: settings.appearance).bottomFollowsMusic },
+            set: { on in
+                if settings.appearance == .glass {
+                    settings.glassGradient.bottomFollowsMusic = on
+                } else {
+                    settings.blackGradient.bottomFollowsMusic = on
+                }
+            })
+    }
 
     var body: some View {
         Form {
             Section {
-                SourcePicker(selection: $settings.audioSource)
-                    .padding(.vertical, 4)
-            } header: {
-                Text("Audio source")
+                Toggle("Show the music player", isOn: $settings.showMusic)
             } footer: {
-                if let footer = sourceFooter {
-                    Text(footer)
+                Text("When off, the first tab shows the calendar, or the time and weather.")
+            }
+            Group {
+                Section {
+                    SourcePicker(selection: $settings.audioSource)
+                        .padding(.vertical, 4)
+                } header: {
+                    Text("Music from")
+                } footer: {
+                    if let footer = sourceFooter {
+                        Text(footer)
+                    }
+                }
+                Section {
+                    Toggle("Shuffle and repeat buttons", isOn: $settings.showShuffleRepeat)
+                    Toggle("Favorite button", isOn: $settings.showFavorite)
+                } header: {
+                    Text("Controls")
+                } footer: {
+                    Text("Buttons only appear when the player supports them. Favorite works with Apple Music.")
+                }
+                Section {
+                    Toggle("Notch colour", isOn: notchFollowsMusic)
+                    Toggle("Equalizer bars", isOn: $settings.tintEqualizer)
+                    Toggle("Progress bar", isOn: $settings.tintProgressBar)
+                } header: {
+                    Text("Colours from the album art")
+                } footer: {
+                    Text("Takes the main colour of the current cover. Notch colour fades the bottom of the notch into it (\(settings.appearance.title) style).")
+                }
+                Section {
+                    // Turning it on starts the audio tap, which is what makes macOS ask.
+                    Toggle("Bars follow the real sound", isOn: Binding(
+                        get: { settings.realAudioVisualizer },
+                        set: { on in
+                            if on { permissions.enableAudioVisualizer() } else { settings.realAudioVisualizer = false }
+                        }))
+                } header: {
+                    Text("Visualizer")
+                } footer: {
+                    Text("macOS asks once for permission to record system audio. Without it the bars use an animation.")
                 }
             }
-            Section {
-                Toggle("Shuffle and repeat buttons", isOn: $settings.showShuffleRepeat)
-                Toggle("Favorite button", isOn: $settings.showFavorite)
-            } header: {
-                Text("Controls")
-            } footer: {
-                Text("Buttons only appear when the player supports them. Favorite works with Apple Music, which also adds the song to your library.")
-            }
-            Section {
-                // Turning it on starts the audio tap, which is what makes macOS ask.
-                Toggle("Real audio visualizer", isOn: Binding(
-                    get: { settings.realAudioVisualizer },
-                    set: { on in
-                        if on { permissions.enableAudioVisualizer() } else { settings.realAudioVisualizer = false }
-                    }))
-            } header: {
-                Text("Visualizer")
-            } footer: {
-                Text("The bars follow the actual sound while music plays. macOS asks once for permission to record system audio, and shows its recording indicator while the bars listen. Without permission the bars use an animation instead.")
-            }
+            .disabled(!settings.showMusic)
         }
         .formStyle(.grouped)
     }
@@ -344,7 +448,7 @@ private struct MediaSettings: View {
         switch settings.audioSource {
         case .nowPlaying: nil
         case .spotify, .appleMusic:
-            "macOS will ask once for permission to control \(settings.audioSource.title)."
+            "Needs permission to control \(settings.audioSource.title) (Permissions)."
         case .youtubeMusic:
             "Works with the YouTube Music desktop app, or music.youtube.com in your browser."
         }

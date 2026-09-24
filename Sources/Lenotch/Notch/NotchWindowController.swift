@@ -352,6 +352,11 @@ final class NotchWindowController {
                 case "intro": self.playIntro()
                 case "peek": self.peek()
                 case "settings":
+                    // "settings music" opens a specific page (closing an open window first).
+                    if parts.count == 2, let page = SettingsSection(rawValue: parts[1]) {
+                        SettingsView.initialSection = page
+                        NSApp.windows.first { $0.title.contains("Settings") }?.close()
+                    }
                     self.model.openSettings()
                     DispatchQueue.main.asyncAfter(deadline: .now() + 1) {
                         if let window = NSApp.windows.first(where: { $0.title.contains("Settings") }) {
