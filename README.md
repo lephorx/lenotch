@@ -2,6 +2,8 @@
 
 A black SwiftUI notch for MacBooks with a Now Playing live activity.
 
+![Lenotch's open notch in Liquid Glass: album art, song title and artist, progress bar and playback controls, with the calendar on the right](docs/lenotchpreview.png)
+
 - **Closed:** blends into the physical notch.
 - **Playing:** the notch widens to show the album art on the left and animated bars on the right.
 - **Open** (hover or click, you choose) has fixed player, shelf, and AI usage tabs:
