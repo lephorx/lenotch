@@ -63,7 +63,7 @@ struct ExpandedView: View {
             TabSwitcher(model: model)
             Spacer(minLength: model.geometry.notchSize.width + 16)
             HStack(spacing: 10) {
-                if model.isCameraAllowed {
+                if model.settings.showMirror, model.isCameraAllowed {
                     HeaderButton(symbol: "camera.fill", label: "Mirror", isOn: model.isMirrorVisible,
                                  action: model.toggleMirror)
                 }

@@ -21,7 +21,8 @@ struct CalendarSettings: View {
     var body: some View {
         Form {
             Section("Events") {
-                Toggle("Show calendar next to music", isOn: $settings.showCalendar)
+                permissions.toggle("Show calendar next to music", isEnabled: $settings.showCalendar, calendar: .events)
+                permissions.toggle("Show reminders", isEnabled: $settings.showReminders, calendar: .reminders)
                 Toggle("Auto scroll to next event", isOn: $settings.autoScrollCalendar)
                 Toggle("Always show full event titles", isOn: $settings.showFullEventTitles)
             }

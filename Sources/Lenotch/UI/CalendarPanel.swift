@@ -37,6 +37,11 @@ struct CalendarPanel: View {
         .onDisappear { model.isOverHorizontalScroller = false }
     }
 
+    /// Reminders only when switched on in Settings (they also need permission to load).
+    private var shownReminders: [CalendarReminder] {
+        model.settings.showReminders ? calendar.reminders : []
+    }
+
     @ViewBuilder
     private func content(now: Date) -> some View {
         switch calendar.access {
@@ -64,7 +69,7 @@ struct CalendarPanel: View {
                     .foregroundStyle(.white.opacity(0.85))
             }
         case .granted:
-            if calendar.events.isEmpty && calendar.reminders.isEmpty {
+            if calendar.events.isEmpty && shownReminders.isEmpty {
                 Text(Calendar.current.isDateInToday(calendar.selectedDay) ? "No more events or reminders today" : "No events or reminders")
                     .font(.system(size: 12, weight: .medium))
                     .foregroundStyle(.white.opacity(0.5))
@@ -81,7 +86,7 @@ struct CalendarPanel: View {
                                 .buttonStyle(.plain)
                                 .id(event.id)
                             }
-                            ForEach(calendar.reminders) { reminder in
+                            ForEach(shownReminders) { reminder in
                                 Button(action: calendar.openRemindersApp) {
                                     ReminderRow(reminder: reminder,
                                                 fullTitle: model.settings.showFullEventTitles)

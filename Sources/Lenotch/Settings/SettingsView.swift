@@ -74,6 +74,11 @@ struct SettingsView: View {
         } detail: {
             detail
                 .navigationTitle(section?.title ?? "Settings")
+                // Switches reflect real permission status, e.g. after returning from System Settings.
+                .onAppear(perform: permissions.refresh)
+                .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
+                    permissions.refresh()
+                }
         }
         .frame(width: 780, height: 580)
     }
@@ -82,12 +87,12 @@ struct SettingsView: View {
     private var detail: some View {
         switch section ?? .general {
         case .general:
-            GeneralSettings(settings: settings, updater: updater,
+            GeneralSettings(settings: settings, permissions: permissions, updater: updater,
                             showOnboarding: showOnboarding, playIntro: playIntro)
         case .appearance:
             AppearanceSettings(settings: settings)
         case .media:
-            MediaSettings(settings: settings)
+            MediaSettings(settings: settings, permissions: permissions)
         case .calendar:
             CalendarSettings(settings: settings, permissions: permissions)
         case .aiUsage:
@@ -111,6 +116,7 @@ struct SettingsView: View {
 
 private struct GeneralSettings: View {
     @Bindable var settings: AppSettings
+    let permissions: PermissionCenter
     let updater: SPUUpdater
     let showOnboarding: () -> Void
     let playIntro: () -> Void
@@ -120,12 +126,13 @@ private struct GeneralSettings: View {
     var body: some View {
         Form {
             Section {
-                Toggle("Calendar next to the music", isOn: $settings.showCalendar)
+                permissions.toggle("Calendar next to the music", isEnabled: $settings.showCalendar, calendar: .events)
+                permissions.cameraToggle("Camera mirror button", isEnabled: $settings.showMirror)
                 Toggle("AirDrop on the shelf", isOn: $settings.showAirDrop)
             } header: {
                 Text("Features")
             } footer: {
-                Text("The calendar also needs calendar access (Permissions).")
+                Text("Features that need a permission turn on only once it's allowed; switching one on asks macOS.")
             }
             Section("Opening") {
                 Picker("Open the notch on", selection: $settings.openMode) {
@@ -286,6 +293,7 @@ private struct GradientSettings: View {
 
 private struct MediaSettings: View {
     @Bindable var settings: AppSettings
+    let permissions: PermissionCenter
 
     var body: some View {
         Form {
@@ -308,7 +316,12 @@ private struct MediaSettings: View {
                 Text("Buttons only appear when the player supports them. Favorite works with Apple Music, which also adds the song to your library.")
             }
             Section {
-                Toggle("Real audio visualizer", isOn: $settings.realAudioVisualizer)
+                // Turning it on starts the audio tap, which is what makes macOS ask.
+                Toggle("Real audio visualizer", isOn: Binding(
+                    get: { settings.realAudioVisualizer },
+                    set: { on in
+                        if on { permissions.enableAudioVisualizer() } else { settings.realAudioVisualizer = false }
+                    }))
             } header: {
                 Text("Visualizer")
             } footer: {
