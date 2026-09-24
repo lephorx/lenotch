@@ -32,6 +32,8 @@ struct CalendarPanel: View {
                 try? await Task.sleep(for: .seconds(60))
             }
         }
+        .onChange(of: model.settings.hiddenCalendarIDs) { _, _ in calendar.refresh() }
+        .onChange(of: model.settings.hiddenReminderListIDs) { _, _ in calendar.refresh() }
         .onDisappear { model.isOverHorizontalScroller = false }
     }
 
@@ -62,26 +64,49 @@ struct CalendarPanel: View {
                     .foregroundStyle(.white.opacity(0.85))
             }
         case .granted:
-            if calendar.events.isEmpty {
-                Text(Calendar.current.isDateInToday(calendar.selectedDay) ? "No more events today" : "No events")
+            if calendar.events.isEmpty && calendar.reminders.isEmpty {
+                Text(Calendar.current.isDateInToday(calendar.selectedDay) ? "No more events or reminders today" : "No events or reminders")
                     .font(.system(size: 12, weight: .medium))
                     .foregroundStyle(.white.opacity(0.5))
                     .padding(.top, 4)
             } else {
-                ScrollView(.vertical, showsIndicators: false) {
-                    VStack(alignment: .leading, spacing: 8) {
-                        ForEach(calendar.events) { event in
-                            Button(action: calendar.openCalendarApp) {
-                                EventRow(event: event, now: now)
+                ScrollViewReader { proxy in
+                    ScrollView(.vertical, showsIndicators: false) {
+                        VStack(alignment: .leading, spacing: 8) {
+                            ForEach(calendar.events) { event in
+                                Button(action: calendar.openCalendarApp) {
+                                    EventRow(event: event, now: now,
+                                             fullTitle: model.settings.showFullEventTitles)
+                                }
+                                .buttonStyle(.plain)
+                                .id(event.id)
                             }
-                            .buttonStyle(.plain)
+                            ForEach(calendar.reminders) { reminder in
+                                Button(action: calendar.openRemindersApp) {
+                                    ReminderRow(reminder: reminder,
+                                                fullTitle: model.settings.showFullEventTitles)
+                                }
+                                .buttonStyle(.plain)
+                            }
                         }
+                    }
+                    .onAppear { scrollToNextEvent(proxy: proxy) }
+                    .onChange(of: calendar.events.map(\.id)) { _, _ in scrollToNextEvent(proxy: proxy) }
+                    .onChange(of: model.settings.autoScrollCalendar) { _, enabled in
+                        if enabled { scrollToNextEvent(proxy: proxy) }
                     }
                 }
                 .id(calendar.selectedDay)
                 .transition(.opacity)
             }
         }
+    }
+
+    private func scrollToNextEvent(proxy: ScrollViewProxy) {
+        guard model.settings.autoScrollCalendar,
+              Calendar.current.isDateInToday(calendar.selectedDay),
+              let next = calendar.events.first(where: { !$0.isAllDay }) else { return }
+        DispatchQueue.main.async { proxy.scrollTo(next.id, anchor: .top) }
     }
 }
 
@@ -164,6 +189,7 @@ private struct DayCell: View {
 private struct EventRow: View {
     let event: CalendarEvent
     let now: Date
+    let fullTitle: Bool
 
     var body: some View {
         HStack(spacing: 8) {
@@ -174,7 +200,7 @@ private struct EventRow: View {
                 Text(event.title)
                     .font(.system(size: 12, weight: .semibold))
                     .foregroundStyle(.white)
-                    .lineLimit(1)
+                    .lineLimit(fullTitle ? nil : 1)
                 HStack(spacing: 4) {
                     if event.isHappening(at: now), !event.isAllDay {
                         Text("Now")
@@ -195,5 +221,30 @@ private struct EventRow: View {
         if event.isAllDay { return "All day" }
         let time = Date.FormatStyle(date: .omitted, time: .shortened)
         return "\(event.start.formatted(time)) – \(event.end.formatted(time))"
+    }
+}
+
+private struct ReminderRow: View {
+    let reminder: CalendarReminder
+    let fullTitle: Bool
+
+    var body: some View {
+        HStack(spacing: 8) {
+            Image(systemName: "checklist")
+                .font(.system(size: 12, weight: .semibold))
+                .foregroundStyle(reminder.color)
+                .frame(width: 12)
+            VStack(alignment: .leading, spacing: 1) {
+                Text(reminder.title)
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundStyle(.white)
+                    .lineLimit(fullTitle ? nil : 1)
+                Text(reminder.hasTime ? reminder.due.formatted(date: .omitted, time: .shortened) : "Due today")
+                    .font(.system(size: 11, weight: .medium))
+                    .foregroundStyle(.white.opacity(0.5))
+            }
+            Spacer(minLength: 0)
+        }
+        .contentShape(Rectangle())
     }
 }

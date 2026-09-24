@@ -20,6 +20,7 @@ final class PermissionCenter {
     }
 
     private(set) var calendar: Status = .notAsked
+    private(set) var reminders: Status = .notAsked
     private(set) var camera: Status = .notAsked
     private(set) var automation: [String: Status] = [:]
 
@@ -47,6 +48,11 @@ final class PermissionCenter {
         case .notDetermined: .notAsked
         default: .denied
         }
+        reminders = switch EKEventStore.authorizationStatus(for: .reminder) {
+        case .fullAccess: .granted
+        case .notDetermined: .notAsked
+        default: .denied
+        }
         camera = switch AVCaptureDevice.authorizationStatus(for: .video) {
         case .authorized: .granted
         case .notDetermined: .notAsked
@@ -62,6 +68,13 @@ final class PermissionCenter {
     func requestCalendar() {
         onPromptStarted?()
         EKEventStore().requestFullAccessToEvents { _, _ in
+            DispatchQueue.main.async { self.finished() }
+        }
+    }
+
+    func requestReminders() {
+        onPromptStarted?()
+        EKEventStore().requestFullAccessToReminders { _, _ in
             DispatchQueue.main.async { self.finished() }
         }
     }

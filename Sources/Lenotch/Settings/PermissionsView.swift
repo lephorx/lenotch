@@ -13,6 +13,11 @@ struct PermissionsView: View {
                 status: permissions.calendar,
                 allow: permissions.requestCalendar,
                 pane: "Privacy_Calendars")
+            row(symbol: "checklist", title: "Reminders",
+                detail: "Due reminders from your selected lists.",
+                status: permissions.reminders,
+                allow: permissions.requestReminders,
+                pane: "Privacy_Reminders")
             row(symbol: "camera.fill", title: "Camera",
                 detail: "The mirror beside the notch.",
                 status: permissions.camera,

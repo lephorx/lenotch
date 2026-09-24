@@ -60,6 +60,10 @@ final class AppSettings {
     var showBatteryPercentage: Bool { didSet { save(showBatteryPercentage, "showBatteryPercentage") } }
     /// Show the calendar next to the music (it also needs calendar permission).
     var showCalendar: Bool { didSet { save(showCalendar, "showCalendar") } }
+    var autoScrollCalendar: Bool { didSet { save(autoScrollCalendar, "autoScrollCalendar") } }
+    var showFullEventTitles: Bool { didSet { save(showFullEventTitles, "showFullEventTitles") } }
+    var hiddenCalendarIDs: Set<String> { didSet { save(Array(hiddenCalendarIDs), "hiddenCalendarIDs") } }
+    var hiddenReminderListIDs: Set<String> { didSet { save(Array(hiddenReminderListIDs), "hiddenReminderListIDs") } }
 
     // MARK: Appearance
     var appearance: Appearance { didSet { save(appearance.rawValue, "appearance") } }
@@ -136,6 +140,10 @@ final class AppSettings {
         hoverDelay = defaults.object(forKey: "hoverDelay") as? Double ?? 0.12
         showBatteryPercentage = bool("showBatteryPercentage", true)
         showCalendar = bool("showCalendar", true)
+        autoScrollCalendar = bool("autoScrollCalendar", true)
+        showFullEventTitles = bool("showFullEventTitles", false)
+        hiddenCalendarIDs = Set(defaults.stringArray(forKey: "hiddenCalendarIDs") ?? [])
+        hiddenReminderListIDs = Set(defaults.stringArray(forKey: "hiddenReminderListIDs") ?? [])
         appearance = defaults.string(forKey: "appearance").flatMap(Appearance.init) ?? .black
         func gradient(_ key: String, _ fallback: NotchGradient) -> NotchGradient {
             defaults.data(forKey: key).flatMap { try? JSONDecoder().decode(NotchGradient.self, from: $0) } ?? fallback

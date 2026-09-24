@@ -34,6 +34,8 @@
 	<string>Lenotch shows your upcoming events next to the music in the notch.</string>
 	<key>NSCalendarsUsageDescription</key>
 	<string>Lenotch shows your upcoming events next to the music in the notch.</string>
+	<key>NSRemindersFullAccessUsageDescription</key>
+	<string>Lenotch shows reminders from the lists you choose next to your calendar events in the notch.</string>
 	<key>NSCameraReactionEffectGesturesEnabledDefault</key>
 	<false/>
 	<key>NSCameraUsageDescription</key>

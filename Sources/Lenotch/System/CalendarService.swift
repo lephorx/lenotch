@@ -14,6 +14,14 @@ struct CalendarEvent: Identifiable, Equatable {
     func isHappening(at date: Date) -> Bool { start <= date && date < end }
 }
 
+struct CalendarReminder: Identifiable {
+    let id: String
+    let title: String
+    let due: Date
+    let hasTime: Bool
+    let color: Color
+}
+
 /// Events of one selected day from the Calendar database (for today, only
 /// the ones that haven't ended yet).
 ///
@@ -25,6 +33,7 @@ final class CalendarService {
 
     private(set) var access: Access = .unknown
     private(set) var events: [CalendarEvent] = []
+    private(set) var reminders: [CalendarReminder] = []
     /// Start of the day whose events are shown.
     private(set) var selectedDay = Calendar.current.startOfDay(for: Date())
 
@@ -36,8 +45,12 @@ final class CalendarService {
         if access == .granted { load() }
     }
 
+    @ObservationIgnored private let settings: AppSettings
     @ObservationIgnored private var store: EKEventStore?
     @ObservationIgnored private var changeObserver: NSObjectProtocol?
+    @ObservationIgnored private var reminderFetchVersion = 0
+
+    init(settings: AppSettings) { self.settings = settings }
 
     deinit {
         if let changeObserver { NotificationCenter.default.removeObserver(changeObserver) }
@@ -64,11 +77,18 @@ final class CalendarService {
         default:
             access = .denied
             events = []
+            reminders = []
         }
     }
 
     func openCalendarApp() {
         if let url = NSWorkspace.shared.urlForApplication(withBundleIdentifier: "com.apple.iCal") {
+            NSWorkspace.shared.openApplication(at: url, configuration: .init())
+        }
+    }
+
+    func openRemindersApp() {
+        if let url = NSWorkspace.shared.urlForApplication(withBundleIdentifier: "com.apple.reminders") {
             NSWorkspace.shared.openApplication(at: url, configuration: .init())
         }
     }
@@ -94,7 +114,10 @@ final class CalendarService {
         guard let endOfDay = calendar.date(byAdding: .day, value: 1, to: selectedDay) else { return }
         let isToday = calendar.isDateInToday(selectedDay)
 
-        events = store.events(matching: store.predicateForEvents(withStart: selectedDay, end: endOfDay, calendars: nil))
+        let calendars = store.calendars(for: .event)
+            .filter { !settings.hiddenCalendarIDs.contains($0.calendarIdentifier) }
+        events = (calendars.isEmpty ? [] : store.events(matching:
+            store.predicateForEvents(withStart: selectedDay, end: endOfDay, calendars: calendars)))
             .filter { !isToday || $0.endDate > now }
             .sorted { ($0.isAllDay ? 0 : 1, $0.startDate) < ($1.isAllDay ? 0 : 1, $1.startDate) }
             .map { event in
@@ -105,5 +128,40 @@ final class CalendarService {
                               isAllDay: event.isAllDay,
                               color: Color(nsColor: event.calendar?.color ?? .systemBlue))
             }
+        loadReminders(endOfDay: endOfDay)
+    }
+
+    private func loadReminders(endOfDay: Date) {
+        reminderFetchVersion += 1
+        let version = reminderFetchVersion
+        guard EKEventStore.authorizationStatus(for: .reminder) == .fullAccess else {
+            reminders = []
+            return
+        }
+        let store = makeStore()
+        let lists = store.calendars(for: .reminder)
+            .filter { !settings.hiddenReminderListIDs.contains($0.calendarIdentifier) }
+        guard !lists.isEmpty else {
+            reminders = []
+            return
+        }
+        let predicate = store.predicateForIncompleteReminders(
+            withDueDateStarting: selectedDay, ending: endOfDay, calendars: lists)
+        store.fetchReminders(matching: predicate) { [weak self] results in
+            DispatchQueue.main.async {
+                guard let self, self.reminderFetchVersion == version else { return }
+                self.reminders = (results ?? []).compactMap { reminder in
+                    guard let components = reminder.dueDateComponents,
+                          let due = Calendar.current.date(from: components),
+                          due >= self.selectedDay, due < endOfDay else { return nil }
+                    return CalendarReminder(id: reminder.calendarItemIdentifier,
+                                            title: reminder.title ?? "Untitled",
+                                            due: due,
+                                            hasTime: components.hour != nil,
+                                            color: Color(nsColor: reminder.calendar.color))
+                }
+                .sorted { $0.due < $1.due }
+            }
+        }
     }
 }

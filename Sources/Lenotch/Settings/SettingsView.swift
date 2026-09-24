@@ -3,7 +3,7 @@ import SwiftUI
 
 /// Settings sections, listed in the sidebar.
 enum SettingsSection: String, CaseIterable, Identifiable {
-    case general, appearance, media, aiUsage, shelf, permissions
+    case general, appearance, media, calendar, aiUsage, shelf, permissions
 
     var id: String { rawValue }
 
@@ -12,6 +12,7 @@ enum SettingsSection: String, CaseIterable, Identifiable {
         case .general: "General"
         case .appearance: "Appearance"
         case .media: "Media"
+        case .calendar: "Calendar"
         case .aiUsage: "AI Usage"
         case .shelf: "Shelf"
         case .permissions: "Permissions"
@@ -23,6 +24,7 @@ enum SettingsSection: String, CaseIterable, Identifiable {
         case .general: "gearshape.fill"
         case .appearance: "paintbrush.fill"
         case .media: "music.note"
+        case .calendar: "calendar"
         case .aiUsage: "sparkles"
         case .shelf: "tray.full.fill"
         case .permissions: "hand.raised.fill"
@@ -35,6 +37,7 @@ enum SettingsSection: String, CaseIterable, Identifiable {
         case .general: .gray
         case .appearance: .indigo
         case .media: .pink
+        case .calendar: .blue
         case .aiUsage: .orange
         case .shelf: .blue
         case .permissions: .green
@@ -82,6 +85,8 @@ struct SettingsView: View {
             AppearanceSettings(settings: settings)
         case .media:
             MediaSettings(settings: settings)
+        case .calendar:
+            CalendarSettings(settings: settings, permissions: permissions)
         case .aiUsage:
             AIUsageSettings(settings: settings)
         case .shelf:

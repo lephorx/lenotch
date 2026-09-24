@@ -44,7 +44,7 @@ final class NotchViewModel {
     let shelf: ShelfStore
     let visualizer: AudioVisualizer
     let camera = CameraMirror()
-    let calendar = CalendarService()
+    let calendar: CalendarService
     let aiUsage = AIUsageService()
     /// The AI usage ring under the pointer, for the bubble below the notch.
     private(set) var usageHover: UsageHover?
@@ -68,6 +68,7 @@ final class NotchViewModel {
         self.geometry = geometry
         self.media = media
         self.settings = settings
+        self.calendar = CalendarService(settings: settings)
         self.battery = battery
         self.shelf = shelf
         self.visualizer = visualizer

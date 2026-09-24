@@ -11,6 +11,7 @@ A black SwiftUI notch for MacBooks with a Now Playing live activity.
 
   Swipe left or right with two fingers to switch tabs. Scroll the calendar's day strip to change dates.
 - **Battery and clock** in the open notch.
+- **Calendar options:** choose which calendars and reminder lists appear, scroll to the next event, and show full event titles. Reminders access is optional and requested only when you click Allow.
 - **Audio source:** Playing Right Now (any app), Spotify, Apple Music or YouTube Music.
   Spotify and Music are read over AppleScript, so the notch follows them even when another
   app owns Now Playing. macOS asks once for permission.
