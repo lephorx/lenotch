@@ -104,14 +104,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                            showAppearancePreview: { [weak self] in self?.notch?.showAppearancePreview() },
                            hideAppearancePreview: { [weak self] in self?.notch?.hideAppearancePreview() }) { [weak self] in
                 guard let self else { return }
-                let isFirstSetup = !settings.hasCompletedOnboarding
                 settings.hasCompletedOnboarding = true
                 windows.close(id: "onboarding")
-                // First time through: celebrate with the intro, now in the style just picked.
-                if isFirstSetup || !settings.hasPlayedIntro {
-                    settings.hasPlayedIntro = true
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { self.playIntro() }
-                }
+                // Finishing the setup always ends with the intro, in the style just picked.
+                settings.hasPlayedIntro = true
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { self.playIntro() }
             }
         }
     }
