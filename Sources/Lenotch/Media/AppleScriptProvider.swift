@@ -82,6 +82,19 @@ final class AppleScriptProvider: PlaybackProvider {
     // Only touched on `queue`.
     private var lastTrackID: String?
     private var artwork: NSImage?
+    /// Recent covers by URL, so going back a track shows its cover at once.
+    private var artworkCache: [String: NSImage] = [:]
+    private var artworkCacheOrder: [String] = []
+    private var changeObserver: NSObjectProtocol?
+
+    /// The player announces every change system-wide; reading right away makes
+    /// song changes show up instantly instead of at the next once-a-second poll.
+    private var changeNotification: Notification.Name {
+        switch player {
+        case .spotify: Notification.Name("com.spotify.client.PlaybackStateChanged")
+        case .music: Notification.Name("com.apple.Music.playerInfo")
+        }
+    }
 
     init(player: Player) {
         self.player = player
@@ -94,11 +107,19 @@ final class AppleScriptProvider: PlaybackProvider {
         timer.setEventHandler { [weak self] in self?.poll() }
         timer.resume()
         self.timer = timer
+        changeObserver = DistributedNotificationCenter.default().addObserver(
+            forName: changeNotification, object: nil, queue: nil
+        ) { [weak self] _ in
+            guard let self else { return }
+            queue.async { self.poll() }
+        }
     }
 
     func stop() {
         timer?.cancel()
         timer = nil
+        if let changeObserver { DistributedNotificationCenter.default().removeObserver(changeObserver) }
+        changeObserver = nil
     }
 
     func togglePlayPause() { command("playpause") }
@@ -180,7 +201,7 @@ final class AppleScriptProvider: PlaybackProvider {
         let trackID = result.atIndex(7)?.stringValue
         if trackID != lastTrackID {
             lastTrackID = trackID
-            artwork = loadArtwork(url: result.atIndex(8)?.stringValue)
+            artwork = loadArtwork(url: result.atIndex(8)?.stringValue, trackID: trackID)
         }
 
         let track = Track(title: title,
@@ -208,11 +229,37 @@ final class AppleScriptProvider: PlaybackProvider {
         }
     }
 
-    private func loadArtwork(url: String?) -> NSImage? {
+    /// The new track's cover. Spotify's is downloaded: it waits briefly so title and
+    /// cover change together, and if the download is slower the title shows first and
+    /// the cover follows as soon as it arrives. Runs on `queue`.
+    private func loadArtwork(url: String?, trackID: String?) -> NSImage? {
         switch player {
         case .spotify:
-            guard let url = url.flatMap(URL.init(string:)), let data = try? Data(contentsOf: url) else { return nil }
-            return ImageDownsampling.image(from: data)
+            guard let url, let address = URL(string: url) else { return nil }
+            if let cached = artworkCache[url] { return cached }
+            var image: NSImage?
+            var finished = false
+            let done = DispatchSemaphore(value: 0)
+            URLSession.shared.dataTask(with: address) { [weak self] data, _, _ in
+                let decoded = data.flatMap { ImageDownsampling.image(from: $0) }
+                guard let self else { return }
+                self.queue.async {
+                    if let decoded { self.cacheArtwork(decoded, for: url) }
+                    if finished {
+                        // Arrived after the title was shown: fill it in now.
+                        guard self.lastTrackID == trackID, let decoded else { return }
+                        self.artwork = decoded
+                        self.poll()
+                    }
+                }
+                image = decoded
+                done.signal()
+            }.resume()
+            if done.wait(timeout: .now() + 0.3) == .timedOut {
+                finished = true
+                return nil
+            }
+            return image
         case .music:
             let data = execute("""
                 tell application "Music"
@@ -222,6 +269,15 @@ final class AppleScriptProvider: PlaybackProvider {
                 end tell
                 """)?.data
             return data.flatMap { ImageDownsampling.image(from: $0) }
+        }
+    }
+
+    private func cacheArtwork(_ image: NSImage, for url: String) {
+        guard artworkCache[url] == nil else { return }
+        artworkCache[url] = image
+        artworkCacheOrder.append(url)
+        if artworkCacheOrder.count > 8 {
+            artworkCache[artworkCacheOrder.removeFirst()] = nil
         }
     }
 
