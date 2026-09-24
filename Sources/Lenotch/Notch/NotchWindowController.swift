@@ -232,16 +232,22 @@ final class NotchWindowController {
         }
     }
 
-    /// Keyboard shortcut: briefly shows the current song under the closed notch, or
-    /// hides it again if it's showing. Does nothing when nothing is playing.
+    /// Keyboard shortcut: closes an open notch and briefly shows the current
+    /// song, or hides the peek if it's already showing.
     func peek() {
         if model.isPeeking {
             peekEnd?.cancel()
             model.isPeeking = false
             return
         }
-        guard model.state == .closed, !model.isShowingIntro,
-              !model.isShowingAppearancePreview, model.media.track != nil else { return }
+        guard !model.isShowingIntro, !model.isShowingAppearancePreview,
+              model.media.track != nil else { return }
+        if model.state == .open {
+            cancelPending()
+            setState(.closed)
+            // A pointer still over the notch must not reopen it over the peek.
+            hoverOpenBlocked = true
+        }
         peekEnd?.cancel()
         model.isPeeking = true
         let end = DispatchWorkItem { [weak self] in self?.model.isPeeking = false }
