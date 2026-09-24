@@ -50,7 +50,7 @@ jobs:
           test -n "$SPARKLE_PRIVATE_KEY"
           printf '%s' "$SPARKLE_PRIVATE_KEY" | .build/artifacts/sparkle/Sparkle/bin/generate_appcast \
             --ed-key-file - \
-            --download-url-prefix "https://github.com/${GITHUB_REPOSITORY}/releases/download/${GITHUB_REF_NAME}/" \
+            --download-url-prefix "https://raw.githubusercontent.com/lephorx/lenotch-updates/main/${GITHUB_REF_NAME}/" \
             build
 
       - uses: actions/upload-artifact@v6
@@ -71,3 +71,26 @@ jobs:
             build/Lenotch.dmg.sha256
             build/appcast.xml
           generate_release_notes: true
+
+      - name: Check out public update files
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: actions/checkout@v6
+        with:
+          repository: lephorx/lenotch-updates
+          ref: main
+          path: public-updates
+          ssh-key: ${{ secrets.LENOTCH_UPDATES_DEPLOY_KEY }}
+
+      - name: Publish public update feed
+        if: startsWith(github.ref, 'refs/tags/v')
+        run: |
+          mkdir -p "public-updates/${GITHUB_REF_NAME}"
+          cp build/Lenotch.dmg build/Lenotch.dmg.sha256 "public-updates/${GITHUB_REF_NAME}/"
+          cp build/appcast.xml public-updates/appcast.xml
+          git -C public-updates config user.name 'github-actions[bot]'
+          git -C public-updates config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git -C public-updates add appcast.xml "${GITHUB_REF_NAME}"
+          if ! git -C public-updates diff --cached --quiet; then
+            git -C public-updates commit -m "Publish Lenotch ${GITHUB_REF_NAME} update"
+            git -C public-updates push origin HEAD:main
+          fi
