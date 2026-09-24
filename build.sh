@@ -64,21 +64,32 @@ case "${1:-}" in
     fi
     DMG="build/Lenotch.dmg"
     STAGE="$(mktemp -d)"
-    trap 'rm -rf "$STAGE"' EXIT
+    MOUNT="$(mktemp -d)"
+    trap 'hdiutil detach "$MOUNT" -quiet 2>/dev/null || true; rm -rf "$STAGE" "$MOUNT"' EXIT
     cp -R "$APP" "$STAGE/"
     rm -f "$DMG"
     create-dmg \
       --volname "Lenotch Installer" \
-      --volicon "Resources/AppIcon.icns" \
-      --background "Resources/dmg-background.png" \
       --window-pos 160 120 \
-      --window-size 760 465 \
-      --text-size 12 \
-      --icon-size 96 \
-      --icon "Lenotch.app" 190 235 \
+      --window-size 600 340 \
+      --text-size 14 \
+      --icon-size 112 \
+      --icon "Lenotch.app" 155 165 \
       --hide-extension "Lenotch.app" \
-      --app-drop-link 570 235 \
+      --app-drop-link 445 165 \
+      --skip-finalize \
       "$DMG" "$STAGE"
+    hdiutil attach -readwrite -nobrowse -mountpoint "$MOUNT" "$DMG" -quiet
+    osascript scripts/style_dmg.applescript "$(basename "$MOUNT")"
+    hdiutil detach "$MOUNT" -quiet
+    rm -f "${DMG%.dmg}-compressed.dmg"
+    hdiutil convert "$DMG" -format UDZO -o "${DMG%.dmg}-compressed.dmg" -quiet
+    mv "${DMG%.dmg}-compressed.dmg" "$DMG"
+    DMG_BYTES="$(stat -f '%z' "$DMG")"
+    if [ "$DMG_BYTES" -ge 4000000 ]; then
+      echo "Installer exceeds 4 MB: $DMG_BYTES bytes" >&2
+      exit 1
+    fi
     echo "Built $DMG"
     ;;
 esac

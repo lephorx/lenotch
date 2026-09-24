@@ -36,8 +36,9 @@ requires `create-dmg` (`brew install create-dmg`).
 ./build.sh dmg       # package build/Lenotch.dmg (ARCHS="arm64 x86_64" for a universal build)
 ```
 
-The DMG opens with a branded drag-to-Applications installation window. Its background
-is generated from [make_dmg_background.swift](scripts/make_dmg_background.swift).
+The DMG opens with a compact drag-to-Applications window. Its native Finder background
+keeps the installer free of visible support files, and the build checks that the
+universal image stays below 4 MB.
 
 ## Releases
 
