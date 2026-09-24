@@ -12,9 +12,12 @@ struct ExpandedView: View {
         VStack(spacing: 0) {
             header
                 .frame(height: model.geometry.notchSize.height)
+            // The new tab's items slide in one by one (`slideIn`); the old tab just fades.
             pageContent
+                .environment(\.pageMovesForward, model.pageMovesForward)
                 .id(model.visiblePage)
-                .transition(.page(forward: model.pageMovesForward))
+                .transition(.asymmetric(insertion: .identity,
+                                        removal: .opacity.animation(.easeOut(duration: 0.12))))
                 .padding(.horizontal, 30)
                 .padding(.bottom, 20)
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -38,12 +41,13 @@ struct ExpandedView: View {
                     if let track = media.track {
                         NowPlayingView(model: model, track: track)
                     } else {
-                        idle
+                        idle.slideIn(0)
                     }
                 }
                 .frame(width: 400)
                 if model.showsCalendar {
                     CalendarPanel(model: model, width: 200)
+                        .slideIn(4)
                 }
             }
         case .shelf:
@@ -184,36 +188,5 @@ private struct HeaderButton: View {
         .onHover { isHovered = $0 }
         .animation(.easeOut(duration: 0.15), value: isHovered)
         .animation(.easeOut(duration: 0.15), value: isOn)
-    }
-}
-
-// MARK: - Page transition
-
-extension AnyTransition {
-    /// Switching tabs: the old page glides a short way out and the new one in from
-    /// the other side, with a fade, a soft blur and a slight scale. Short travel
-    /// keeps it light; the pages never cross the whole notch.
-    static func page(forward: Bool) -> AnyTransition {
-        let travel: CGFloat = 48
-        return .asymmetric(
-            insertion: .modifier(active: PageMotion(offset: forward ? travel : -travel), identity: .identity),
-            removal: .modifier(active: PageMotion(offset: forward ? -travel : travel), identity: .identity))
-    }
-}
-
-private struct PageMotion: ViewModifier {
-    var offset: CGFloat
-    var blur: CGFloat = 6
-    var scale: CGFloat = 0.96
-    var opacity: Double = 0
-
-    static let identity = PageMotion(offset: 0, blur: 0, scale: 1, opacity: 1)
-
-    func body(content: Content) -> some View {
-        content
-            .offset(x: offset)
-            .scaleEffect(scale)
-            .blur(radius: blur)
-            .opacity(opacity)
     }
 }

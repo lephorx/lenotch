@@ -10,6 +10,7 @@ struct NowPlayingView: View {
     var body: some View {
         HStack(alignment: .center, spacing: 24) {
             artwork
+                .slideIn(0)
 
             VStack(alignment: .leading, spacing: 0) {
                 HStack(alignment: .top, spacing: 8) {
@@ -29,10 +30,13 @@ struct NowPlayingView: View {
                                          action: media.toggleFavorite)
                     }
                 }
+                .slideIn(1)
                 Spacer(minLength: 4)
                 ProgressBar(model: model, duration: track.duration)
+                    .slideIn(2)
                 Spacer(minLength: 4)
                 controls
+                    .slideIn(3)
             }
             // Tall enough for title, progress (with its larger click area) and controls,
             // so nothing is pushed up and clipped.

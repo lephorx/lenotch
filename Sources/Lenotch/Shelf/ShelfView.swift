@@ -20,9 +20,11 @@ struct ShelfView: View {
                     Button("Clear Shelf") { shelf.removeAll() }
                 }
             }
+            .slideIn(0)
 
             if model.settings.showAirDrop {
                 AirDropTarget(shelf: shelf, glass: glass)
+                    .slideIn(1)
             }
         }
         .animation(.easeOut(duration: 0.15), value: isDropTargeted)
