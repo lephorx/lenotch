@@ -389,6 +389,12 @@ final class NotchWindowController {
                     if let index = Int(parts[1]), self.model.pages.indices.contains(index) {
                         self.model.selectedPage = self.model.pages[index]
                     }
+                case "snapwin" where parts.count >= 2:
+                    // Snapshot another window by (part of) its title, e.g. "snapwin Welcome".
+                    let title = parts.dropFirst().joined(separator: " ")
+                    if let window = NSApp.windows.first(where: { $0.title.contains(title) }) {
+                        self.debugSnapshot(window, to: dir + "/snap-window.png")
+                    }
                 case "intro": self.playIntro()
                 case "peek": self.peek()
                 case "settings":
