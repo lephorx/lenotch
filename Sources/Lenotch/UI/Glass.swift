@@ -10,6 +10,9 @@ enum NotchGlassStyle {
 extension View {
     /// Liquid Glass behind the view when `enabled` (material blur before macOS 26).
     /// Everything glass in the notch goes through here so it stays consistent.
+    /// Decorative glass must not take clicks: a glass layer's hit area can reach far
+    /// beyond its shape (a pill's glass swallowed clicks on the progress bar above it),
+    /// so glass backgrounds are marked `.allowsHitTesting(false)`.
     @ViewBuilder
     func notchGlass<S: Shape>(_ enabled: Bool, in shape: S, style: NotchGlassStyle = .clear,
                               tint: Color? = nil) -> some View {
@@ -35,6 +38,7 @@ struct GlassIcon<S: Shape>: View {
         Color.clear
             .frame(width: size.width, height: size.height)
             .notchGlass(true, in: shape, tint: highlight > 0 ? .white.opacity(highlight) : nil)
+            .allowsHitTesting(false)
     }
 }
 
@@ -56,6 +60,7 @@ struct GlassCard<Content: View>: View {
                     // Clear, untinted glass at half strength so the cards stay see-through.
                     Color.clear.notchGlass(true, in: shape, tint: isRaised ? .white.opacity(0.06) : nil)
                         .opacity(isRaised ? 0.7 : 0.5)
+                        .allowsHitTesting(false)
                 }
             }
             .animation(.easeOut(duration: 0.2), value: isRaised)

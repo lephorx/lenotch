@@ -34,7 +34,7 @@ struct NotchView: View {
             .animation(.spring(response: 0.45, dampingFraction: 0.8), value: model.isPeeking)
             .animation(.spring(response: 0.42, dampingFraction: 0.82), value: model.showsLiveActivity)
             .animation(.easeInOut(duration: 0.3), value: model.settings.appearance)
-            .animation(.easeInOut(duration: 0.6), value: model.backgroundGradient)
+            .animation(.easeInOut(duration: 0.25), value: model.backgroundGradient)
             .animation(.easeInOut(duration: 0.6), value: model.accentColor)
             .environment(\.colorScheme, .dark)
     }

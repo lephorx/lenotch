@@ -37,6 +37,6 @@ struct EqualizerBars: View {
             }
         }
         .animation(.easeOut(duration: 0.3), value: isPlaying)
-        .animation(.easeInOut(duration: 0.6), value: color)
+        .animation(.easeInOut(duration: 0.25), value: color)
     }
 }

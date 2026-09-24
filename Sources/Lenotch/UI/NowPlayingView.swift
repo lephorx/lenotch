@@ -103,7 +103,7 @@ struct NowPlayingView: View {
                 if glass {
                     // Glass that shows the same shade of the colour transition as the notch around it.
                     ZStack {
-                        Color.clear.notchGlass(true, in: Capsule())
+                        Color.clear.notchGlass(true, in: Capsule()).allowsHitTesting(false)
                         NotchGradientSlice(model: model).clipShape(Capsule())
                         if let pillColor { Capsule().fill(pillColor.opacity(0.10)) }
                     }
