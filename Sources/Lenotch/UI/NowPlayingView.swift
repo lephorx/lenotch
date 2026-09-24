@@ -80,6 +80,8 @@ struct NowPlayingView: View {
     private var controls: some View {
         let showExtras = model.settings.showShuffleRepeat
         let activeColor = model.accentColor ?? .white
+        let pillColor = model.settings.gradient(for: model.settings.appearance).bottomFollowsMusic
+            ? model.accentColor : nil
         return HStack(spacing: 0) {
             Group {
                 if showExtras, let shuffle = media.shuffle {
@@ -103,9 +105,13 @@ struct NowPlayingView: View {
                     ZStack {
                         Color.clear.notchGlass(true, in: Capsule())
                         NotchGradientSlice(model: model).clipShape(Capsule())
+                        if let pillColor { Capsule().fill(pillColor.opacity(0.10)) }
                     }
                 } else {
-                    Capsule().fill(.white.opacity(0.08))
+                    ZStack {
+                        Capsule().fill(.white.opacity(0.08))
+                        if let pillColor { Capsule().fill(pillColor.opacity(0.12)) }
+                    }
                 }
             }
             Spacer(minLength: 0)
