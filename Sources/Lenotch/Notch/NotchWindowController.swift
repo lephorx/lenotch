@@ -182,14 +182,31 @@ final class NotchWindowController {
     /// Plays the logo intro in the notch.
     func playIntro() {
         guard !model.isShowingIntro else { return }
+        hideAppearancePreview()
         setState(.closed)
         cancelPending()
         model.isShowingIntro = true
     }
 
+    func showAppearancePreview() {
+        guard !model.isShowingIntro else { return }
+        cancelPending()
+        setState(.closed)
+        peekEnd?.cancel()
+        model.isPeeking = false
+        model.isShowingAppearancePreview = true
+        panel.ignoresMouseEvents = true
+    }
+
+    func hideAppearancePreview() {
+        guard model.isShowingAppearancePreview else { return }
+        model.isShowingAppearancePreview = false
+        panel.ignoresMouseEvents = true
+    }
+
     /// Keyboard shortcut: opens or closes the notch wherever the pointer is.
     func toggleOpen() {
-        guard !model.isShowingIntro else { return }
+        guard !model.isShowingIntro, !model.isShowingAppearancePreview else { return }
         cancelPending()
         if model.state == .open {
             setState(.closed)
@@ -207,7 +224,8 @@ final class NotchWindowController {
             model.isPeeking = false
             return
         }
-        guard model.state == .closed, !model.isShowingIntro, model.media.track != nil else { return }
+        guard model.state == .closed, !model.isShowingIntro,
+              !model.isShowingAppearancePreview, model.media.track != nil else { return }
         peekEnd?.cancel()
         model.isPeeking = true
         let end = DispatchWorkItem { [weak self] in self?.model.isPeeking = false }
@@ -216,7 +234,7 @@ final class NotchWindowController {
     }
 
     private func handle(_ event: NSEvent) {
-        guard !model.isShowingIntro else { return }
+        guard !model.isShowingIntro, !model.isShowingAppearancePreview else { return }
         let location = NSEvent.mouseLocation
         let geometry = model.geometry
         let settings = model.settings

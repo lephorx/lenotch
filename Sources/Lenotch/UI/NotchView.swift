@@ -6,7 +6,7 @@ struct NotchView: View {
 
     private var isOpen: Bool { model.state == .open }
     /// Open or playing the intro: uses the open notch's shape and background.
-    private var isExpanded: Bool { isOpen || model.isShowingIntro || model.isPeeking }
+    private var isExpanded: Bool { isOpen || model.isShowingIntro || model.isShowingAppearancePreview || model.isPeeking }
 
     var body: some View {
         let size = model.currentSize
@@ -27,6 +27,7 @@ struct NotchView: View {
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
             .animation(.spring(response: 0.42, dampingFraction: 0.82), value: model.state)
             .animation(.spring(response: 0.5, dampingFraction: 0.78), value: model.isShowingIntro)
+            .animation(.spring(response: 0.5, dampingFraction: 0.78), value: model.isShowingAppearancePreview)
             .animation(.spring(response: 0.45, dampingFraction: 0.8), value: model.isPeeking)
             .animation(.spring(response: 0.42, dampingFraction: 0.82), value: model.showsLiveActivity)
             .animation(.easeInOut(duration: 0.3), value: model.settings.appearance)
@@ -38,6 +39,9 @@ struct NotchView: View {
     private var content: some View {
         if model.isShowingIntro {
             IntroView(notchHeight: model.geometry.notchSize.height) { model.isShowingIntro = false }
+                .transition(.opacity)
+        } else if model.isShowingAppearancePreview {
+            AppearanceLivePreview(notchHeight: model.geometry.notchSize.height)
                 .transition(.opacity)
         } else if isOpen {
             ExpandedView(model: model)

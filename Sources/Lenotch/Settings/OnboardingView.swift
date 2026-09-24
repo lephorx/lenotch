@@ -5,6 +5,8 @@ import SwiftUI
 struct OnboardingView: View {
     @Bindable var settings: AppSettings
     let permissions: PermissionCenter
+    let showAppearancePreview: () -> Void
+    let hideAppearancePreview: () -> Void
     let finish: () -> Void
 
     private static let lastStep = 2
@@ -42,6 +44,11 @@ struct OnboardingView: View {
         .padding(.bottom, 24)
         .frame(width: 560)
         .animation(.spring(response: 0.4, dampingFraction: 0.85), value: step)
+        .onChange(of: step) { oldStep, newStep in
+            if newStep == 1 { showAppearancePreview() }
+            else if oldStep == 1 { hideAppearancePreview() }
+        }
+        .onDisappear(perform: hideAppearancePreview)
     }
 
     private var header: some View {
@@ -58,7 +65,7 @@ struct OnboardingView: View {
             Text(["Welcome to Lenotch", "Choose a Style", "Permissions"][step])
                 .font(.system(size: 22, weight: .bold))
             Text(["Which app should the notch show music from?",
-                  "How should the notch look when it opens?",
+                  "See the notch above as you choose its style and opacity.",
                   "Allow only what you want to use. You can change this any time in Settings."][step])
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)

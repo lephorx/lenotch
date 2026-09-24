@@ -32,6 +32,8 @@ final class NotchViewModel {
     var state: State = .closed
     /// The first-launch intro is playing (the notch ignores the pointer meanwhile).
     var isShowingIntro = false
+    /// Keeps the chosen appearance visible while the setup opacity slider is adjusted.
+    var isShowingAppearancePreview = false
     /// Briefly showing the current song under the closed notch.
     var isPeeking = false
     var selectedPage: NotchPage = .player
@@ -194,7 +196,7 @@ final class NotchViewModel {
     }
 
     var currentSize: CGSize {
-        if isShowingIntro { return geometry.introSize }
+        if isShowingIntro || isShowingAppearancePreview { return geometry.introSize }
         if isPeeking, state == .closed { return geometry.peekSize }
         return switch state {
         case .open: openSize(for: visiblePage)

@@ -100,7 +100,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     func showOnboarding() {
         // Floating, so it stays in view while macOS permission prompts come and go.
         windows.show(id: "onboarding", title: "Welcome to Lenotch", floating: true) {
-            OnboardingView(settings: settings, permissions: permissions) { [weak self] in
+            OnboardingView(settings: settings, permissions: permissions,
+                           showAppearancePreview: { [weak self] in self?.notch?.showAppearancePreview() },
+                           hideAppearancePreview: { [weak self] in self?.notch?.hideAppearancePreview() }) { [weak self] in
                 guard let self else { return }
                 let isFirstSetup = !settings.hasCompletedOnboarding
                 settings.hasCompletedOnboarding = true
