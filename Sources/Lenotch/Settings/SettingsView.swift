@@ -70,12 +70,12 @@ enum SettingsSection: String, CaseIterable, Identifiable {
     var keywords: [String] {
         switch self {
         case .general: ["open", "hover", "click", "delay", "shortcut", "keyboard", "menu bar", "icon", "login",
-                        "startup", "update", "welcome", "intro", "peek"]
+                        "startup", "update", "welcome", "intro", "peek", "volume", "brightness", "indicator", "hud"]
         case .look: ["style", "black", "glass", "liquid", "opacity", "transparent", "colour", "color", "gradient",
                      "fade", "battery", "percentage", "look", "appearance", "theme"]
         case .music: ["music", "song", "player", "spotify", "apple music", "youtube", "source", "shuffle", "repeat",
                       "favorite", "like", "album", "art", "cover", "colour", "color", "equalizer", "bars",
-                      "progress", "visualizer", "audio", "sound"]
+                      "progress", "visualizer", "audio", "sound", "peek", "track change"]
         case .calendar: ["calendar", "events", "month", "day strip", "reminders", "schedule", "date"]
         case .weather: ["weather", "temperature", "city", "location", "celsius", "fahrenheit", "forecast"]
         case .shelf: ["shelf", "files", "drop", "drag", "airdrop", "share"]
@@ -407,6 +407,11 @@ private struct MusicSettings: View {
                     if let footer = sourceFooter {
                         Text(footer)
                     }
+                }
+                Section {
+                    Toggle("Peek when the song changes", isOn: $settings.peekOnTrackChange)
+                } footer: {
+                    Text("Briefly shows the new song's cover and title in the closed notch.")
                 }
                 Section {
                     Toggle("Shuffle and repeat buttons", isOn: $settings.showShuffleRepeat)

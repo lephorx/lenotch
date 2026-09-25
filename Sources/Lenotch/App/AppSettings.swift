@@ -79,6 +79,12 @@ final class AppSettings {
     var showCalendar: Bool { didSet { save(showCalendar, "showCalendar") } }
     /// The music player in the first tab; off leaves the calendar (or the weather home view).
     var showMusic: Bool { didSet { save(showMusic, "showMusic") } }
+    /// Briefly show the new song in the closed notch when the track changes.
+    var peekOnTrackChange: Bool { didSet { save(peekOnTrackChange, "peekOnTrackChange") } }
+    /// Show volume changes beside the notch.
+    var showVolumeIndicator: Bool { didSet { save(showVolumeIndicator, "showVolumeIndicator") } }
+    /// Show brightness changes beside the notch.
+    var showBrightnessIndicator: Bool { didSet { save(showBrightnessIndicator, "showBrightnessIndicator") } }
     var expandedCalendarStyle: ExpandedCalendarStyle {
         didSet { save(expandedCalendarStyle.rawValue, "expandedCalendarStyle") }
     }
@@ -182,6 +188,9 @@ final class AppSettings {
         showMenuBarIcon = bool("showMenuBarIcon", true)
         showCalendar = bool("showCalendar", true)
         showMusic = bool("showMusic", true)
+        peekOnTrackChange = bool("peekOnTrackChange", true)
+        showVolumeIndicator = bool("showVolumeIndicator", true)
+        showBrightnessIndicator = bool("showBrightnessIndicator", true)
         expandedCalendarStyle = defaults.string(forKey: "expandedCalendarStyle")
             .flatMap(ExpandedCalendarStyle.init) ?? .month
         weatherPlace = defaults.data(forKey: "weatherPlace").flatMap { try? JSONDecoder().decode(WeatherPlace.self, from: $0) }

@@ -58,6 +58,10 @@ final class NotchWindowController {
         tooltipPanel.orderFrontRegardless()
         model.onUsageHoverChange = { [weak self] in self?.positionTooltip() }
         model.onOpenSizeChange = { [weak self] in self?.positionMirror() }
+        media.onTrackChange = { [weak self] in
+            // After the current update, so the peek shows the new song's details.
+            DispatchQueue.main.async { self?.peekForTrackChange() }
+        }
 
         installMouseMonitors()
         #if DEBUG
@@ -248,6 +252,19 @@ final class NotchWindowController {
             // A pointer still over the notch must not reopen it over the peek.
             hoverOpenBlocked = true
         }
+        peekEnd?.cancel()
+        model.isPeeking = true
+        let end = DispatchWorkItem { [weak self] in self?.model.isPeeking = false }
+        peekEnd = end
+        DispatchQueue.main.asyncAfter(deadline: .now() + Self.peekDuration, execute: end)
+    }
+
+    /// Shows the new song in the closed notch, if turned on. Unlike the shortcut it
+    /// never closes an open notch, and a showing peek just stays up longer.
+    private func peekForTrackChange() {
+        guard model.settings.peekOnTrackChange, model.state == .closed,
+              !model.isShowingIntro, !model.isShowingAppearancePreview,
+              model.media.track != nil else { return }
         peekEnd?.cancel()
         model.isPeeking = true
         let end = DispatchWorkItem { [weak self] in self?.model.isPeeking = false }
