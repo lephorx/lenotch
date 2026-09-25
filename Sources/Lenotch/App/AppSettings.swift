@@ -91,6 +91,8 @@ final class AppSettings {
     var showBrightnessIndicator: Bool { didSet { save(showBrightnessIndicator, "showBrightnessIndicator") } }
     /// Take over the volume/brightness keys so macOS's own indicator doesn't show
     /// (only works once Accessibility is allowed).
+    /// Download/upload speed beside the closed notch while a big transfer runs.
+    var showNetworkSpeed: Bool { didSet { save(showNetworkSpeed, "showNetworkSpeed") } }
     /// Crypto prices beside the closed notch while nothing is playing.
     var showCrypto: Bool { didSet { save(showCrypto, "showCrypto") } }
     /// CoinGecko ids, in catalogue order.
@@ -210,6 +212,7 @@ final class AppSettings {
         hideSystemIndicator = bool("hideSystemIndicator", true)
         showPrivacyIndicator = bool("showPrivacyIndicator", true)
         showCrypto = bool("showCrypto", false)
+        showNetworkSpeed = bool("showNetworkSpeed", true)
         cryptoCoins = defaults.stringArray(forKey: "cryptoCoins") ?? ["bitcoin", "ethereum"]
         cryptoCurrency = defaults.string(forKey: "cryptoCurrency")
             ?? (["EUR", "CHF", "GBP", "JPY"].contains(Locale.current.currency?.identifier ?? "")

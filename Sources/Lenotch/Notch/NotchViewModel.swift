@@ -40,6 +40,9 @@ final class NotchViewModel {
     var isPeeking = false
     /// A volume or brightness change showing beside the closed notch.
     var indicator: SystemIndicator?
+    /// Transfer speed while a download or upload runs (nil when quiet).
+    var network: NetworkMonitor.Speed?
+    var showsNetwork: Bool { settings.showNetworkSpeed && network != nil }
     /// The crypto ticker fills the closed notch while nothing else shows there.
     var showsCrypto: Bool { settings.showCrypto && !crypto.prices.isEmpty }
     /// Apps using the microphone or camera right now.
@@ -218,7 +221,7 @@ final class NotchViewModel {
         case .open: openSize(for: visiblePage)
         case .closed:
             showsLiveActivity ? geometry.liveSize
-                : showsCrypto ? geometry.indicatorSize : geometry.closedSize
+                : showsNetwork || showsCrypto ? geometry.indicatorSize : geometry.closedSize
         }
     }
 }

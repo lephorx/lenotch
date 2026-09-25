@@ -73,7 +73,7 @@ enum SettingsSection: String, CaseIterable, Identifiable {
     var keywords: [String] {
         switch self {
         case .general: ["open", "hover", "click", "delay", "shortcut", "keyboard", "menu bar", "icon", "login",
-                        "startup", "update", "welcome", "intro", "peek", "what's new", "release notes", "changelog", "volume", "brightness", "indicator", "hud", "accessibility", "microphone", "mic", "privacy", "recording"]
+                        "startup", "update", "welcome", "intro", "peek", "what's new", "release notes", "changelog", "volume", "brightness", "indicator", "hud", "accessibility", "microphone", "mic", "privacy", "recording", "network", "download", "upload", "speed"]
         case .look: ["style", "black", "glass", "liquid", "opacity", "transparent", "colour", "color", "gradient",
                      "fade", "battery", "percentage", "look", "appearance", "theme"]
         case .music: ["music", "song", "player", "spotify", "apple music", "youtube", "source", "shuffle", "repeat",
@@ -251,8 +251,9 @@ private struct GeneralSettings: View {
             }
             Section {
                 Toggle("Microphone and camera in use", isOn: $settings.showPrivacyIndicator)
+                Toggle("Network speed during downloads", isOn: $settings.showNetworkSpeed)
             } footer: {
-                Text("Draws an orange outline around the notch while an app uses the microphone, or a green one for the camera. No permission needed.")
+                Text("An orange outline around the notch while an app uses the microphone (green for the camera). Download and upload speed shows beside the notch while a big transfer runs and no music plays. No permission needed.")
             }
             Section {
                 Toggle("Show icon in the menu bar", isOn: $settings.showMenuBarIcon)

@@ -46,6 +46,7 @@ struct NotchView: View {
             .animation(.spring(response: 0.38, dampingFraction: 0.82), value: model.indicator != nil)
             .animation(.spring(response: 0.42, dampingFraction: 0.82), value: model.showsPrivacy)
             .animation(.spring(response: 0.42, dampingFraction: 0.82), value: model.showsCrypto)
+            .animation(.spring(response: 0.42, dampingFraction: 0.82), value: model.showsNetwork)
             // Turning the ticker on, or picking other coins, fetches right away.
             .task(id: "\(model.settings.showCrypto)\(model.settings.cryptoCoins)\(model.settings.cryptoCurrency)") {
                 model.crypto.refresh()
@@ -83,6 +84,9 @@ struct NotchView: View {
                 .transition(.opacity.combined(with: .scale(0.95, anchor: .top)))
         } else if model.showsLiveActivity {
             LiveActivityView(model: model)
+                .transition(.opacity)
+        } else if model.showsNetwork, let speed = model.network {
+            NetworkSpeedView(speed: speed, notchWidth: model.geometry.notchSize.width)
                 .transition(.opacity)
         } else if model.showsCrypto {
             CryptoTickerView(model: model)

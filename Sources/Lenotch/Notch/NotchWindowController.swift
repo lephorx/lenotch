@@ -28,6 +28,7 @@ final class NotchWindowController {
     private let indicators = SystemIndicators()
     private let mediaKeys = MediaKeyTap()
     private let privacyMonitor = PrivacyMonitor()
+    private let networkMonitor = NetworkMonitor()
     /// Waits for Accessibility to be allowed in System Settings, then starts the key tap.
     private var accessibilityWait: Timer?
     private var indicatorEnd: DispatchWorkItem?
@@ -74,6 +75,7 @@ final class NotchWindowController {
             DispatchQueue.main.async { self?.showIndicator(indicator) }
         }
         privacyMonitor.onChange = { [weak self] activity in self?.model.privacy = activity }
+        networkMonitor.onChange = { [weak self] speed in self?.model.network = speed }
         mediaKeys.onKey = { [weak self] key, fine in self?.handleMediaKey(key, fine: fine) ?? false }
         followIndicatorSettings()
         installMouseMonitors()
@@ -282,6 +284,7 @@ final class NotchWindowController {
             mediaKeys.handlesBrightness = settings.hideSystemIndicator && settings.showBrightnessIndicator
             updateMediaKeyTap()
             privacyMonitor.isEnabled = settings.showPrivacyIndicator
+            networkMonitor.isEnabled = settings.showNetworkSpeed
         } onChange: { [weak self] in
             DispatchQueue.main.async { self?.followIndicatorSettings() }
         }
@@ -518,7 +521,7 @@ final class NotchWindowController {
                 }
             }
             let page = self.model.visiblePage.rawValue
-            let status = "state=\(self.model.state) intro=\(self.model.isShowingIntro) page=\(page)/\(self.model.pages.count) mirror=\(self.model.isMirrorVisible) camera=\(self.model.camera.status) keytap=\(self.mediaKeys.isRunning)\n"
+            let status = "state=\(self.model.state) intro=\(self.model.isShowingIntro) page=\(page)/\(self.model.pages.count) mirror=\(self.model.isMirrorVisible) camera=\(self.model.camera.status) keytap=\(self.mediaKeys.isRunning) network=\(String(describing: self.model.network))\n"
             try? status.write(toFile: output, atomically: true, encoding: .utf8)
         }
     }
