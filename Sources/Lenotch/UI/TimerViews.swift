@@ -61,42 +61,43 @@ struct TimerLiveView: View {
     }
 }
 
-/// The card the notch folds down into when a timer ends: a ringing bell and a
-/// pulsing glow, until the pointer opens the notch or it folds back up.
+/// The card the notch folds down into when a timer ends, like iOS: the timer symbol,
+/// 0:00 and an X to stop the alarm.
 struct TimerDoneView: View {
     let model: NotchViewModel
     @State private var ring = false
     @State private var glow = false
 
     var body: some View {
-        HStack(spacing: 12) {
-            ZStack {
-                Circle()
-                    .fill(Color.orange.opacity(glow ? 0.35 : 0.12))
-                    .frame(width: 40, height: 40)
-                    .scaleEffect(glow ? 1.12 : 0.9)
-                Image(systemName: "bell.fill")
-                    .font(.system(size: 18, weight: .semibold))
-                    .foregroundStyle(.orange)
-                    .rotationEffect(.degrees(ring ? 16 : -16), anchor: .top)
-            }
-            VStack(alignment: .leading, spacing: 2) {
-                Text("Timer done")
-                    .font(.system(size: 14, weight: .bold))
-                    .foregroundStyle(.white)
-                Text(model.finishedTimerLabel)
-                    .font(.system(size: 12, weight: .medium))
-                    .foregroundStyle(.white.opacity(0.6))
-            }
+        HStack(spacing: 14) {
+            Image(systemName: "timer")
+                .font(.system(size: 24, weight: .semibold))
+                .foregroundStyle(.orange)
+                .rotationEffect(.degrees(ring ? 10 : -10))
+                .shadow(color: .orange.opacity(glow ? 0.8 : 0), radius: 8)
             Spacer(minLength: 0)
+            Text("0:00")
+                .font(.system(size: 30, weight: .semibold).monospacedDigit())
+                .foregroundStyle(.orange)
+                .opacity(glow ? 1 : 0.55)
+            Button { model.onStopAlarm?() } label: {
+                Image(systemName: "xmark")
+                    .font(.system(size: 15, weight: .bold))
+                    .foregroundStyle(.white)
+                    .frame(width: 38, height: 38)
+                    .background(Circle().fill(Color.orange))
+                    .contentShape(Circle())
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("Stop")
         }
-        .padding(.horizontal, 18)
+        .padding(.horizontal, 20)
         .padding(.top, model.geometry.notchSize.height + 8)
         .padding(.bottom, 12)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
         .onAppear {
-            withAnimation(.easeInOut(duration: 0.12).repeatForever(autoreverses: true)) { ring = true }
-            withAnimation(.easeInOut(duration: 0.8).repeatForever(autoreverses: true)) { glow = true }
+            withAnimation(.easeInOut(duration: 0.1).repeatForever(autoreverses: true)) { ring = true }
+            withAnimation(.easeInOut(duration: 0.6).repeatForever(autoreverses: true)) { glow = true }
         }
     }
 }
@@ -135,6 +136,12 @@ struct TimerPanel: View {
                     .foregroundStyle(.white)
                     .frame(width: 70)
                 roundButton("plus") { customMinutes = min(600, customMinutes + (customMinutes >= 10 ? 5 : 1)) }
+                // Silent timers still fold the notch down, just without the alarm.
+                roundButton(model.settings.timerSilent ? "bell.slash.fill" : "bell.fill",
+                            tint: model.settings.timerSilent ? .white.opacity(0.12) : .orange.opacity(0.35)) {
+                    model.settings.timerSilent.toggle()
+                }
+                .padding(.leading, 14)
             }
         }
         .slideIn(0)
@@ -161,6 +168,11 @@ struct TimerPanel: View {
                         roundButton("xmark", size: 40) { timer.cancel() }
                     }
                     chip("+1 min") { timer.add(60) }
+                    if timer.isSilent {
+                        Label("Silent", systemImage: "bell.slash.fill")
+                            .font(.system(size: 11, weight: .medium))
+                            .foregroundStyle(.white.opacity(0.5))
+                    }
                 }
             }
             .slideIn(0)
@@ -168,7 +180,7 @@ struct TimerPanel: View {
     }
 
     private func start(_ minutes: Int) {
-        model.timer.start(TimeInterval(minutes * 60))
+        model.timer.start(TimeInterval(minutes * 60), silent: model.settings.timerSilent)
     }
 
     private func chip(_ title: String, highlighted: Bool = false, action: @escaping () -> Void) -> some View {
@@ -183,13 +195,14 @@ struct TimerPanel: View {
         .buttonStyle(.plain)
     }
 
-    private func roundButton(_ symbol: String, size: CGFloat = 28, action: @escaping () -> Void) -> some View {
+    private func roundButton(_ symbol: String, size: CGFloat = 28, tint: Color = .white.opacity(0.12),
+                             action: @escaping () -> Void) -> some View {
         Button(action: action) {
             Image(systemName: symbol)
                 .font(.system(size: size * 0.38, weight: .bold))
                 .foregroundStyle(.white)
                 .frame(width: size, height: size)
-                .background(Circle().fill(.white.opacity(0.12)))
+                .background(Circle().fill(tint))
                 .contentShape(Circle())
         }
         .buttonStyle(.plain)

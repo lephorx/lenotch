@@ -91,6 +91,10 @@ final class AppSettings {
     var showBrightnessIndicator: Bool { didSet { save(showBrightnessIndicator, "showBrightnessIndicator") } }
     /// Take over the volume/brightness keys so macOS's own indicator doesn't show
     /// (only works once Accessibility is allowed).
+    /// The timer button in the open notch's header (off by default).
+    var showTimer: Bool { didSet { save(showTimer, "showTimer") } }
+    /// Start timers without the alarm sound.
+    var timerSilent: Bool { didSet { save(timerSilent, "timerSilent") } }
     /// Download/upload speed beside the closed notch while a big transfer runs.
     var showNetworkSpeed: Bool { didSet { save(showNetworkSpeed, "showNetworkSpeed") } }
     /// Crypto prices beside the closed notch while nothing is playing.
@@ -213,6 +217,8 @@ final class AppSettings {
         showPrivacyIndicator = bool("showPrivacyIndicator", true)
         showCrypto = bool("showCrypto", false)
         showNetworkSpeed = bool("showNetworkSpeed", true)
+        showTimer = bool("showTimer", false)
+        timerSilent = bool("timerSilent", false)
         cryptoCoins = defaults.stringArray(forKey: "cryptoCoins") ?? ["bitcoin", "ethereum"]
         cryptoCurrency = defaults.string(forKey: "cryptoCurrency")
             ?? (["EUR", "CHF", "GBP", "JPY"].contains(Locale.current.currency?.identifier ?? "")

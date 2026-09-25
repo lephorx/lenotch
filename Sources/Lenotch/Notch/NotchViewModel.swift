@@ -45,8 +45,8 @@ final class NotchViewModel {
     var isTimerPanelVisible = false
     /// A timer just ended: the notch folds down with a ringing bell.
     var isTimerFinished = false
-    /// "5 min timer", for the done card.
-    var finishedTimerLabel = ""
+    /// Stops the ringing alarm (the done card's X).
+    @ObservationIgnored var onStopAlarm: (() -> Void)?
     /// Transfer speed while a download or upload runs (nil when quiet).
     var network: NetworkMonitor.Speed?
     var showsNetwork: Bool { settings.showNetworkSpeed && network != nil }

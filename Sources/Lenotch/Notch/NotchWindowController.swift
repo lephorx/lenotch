@@ -78,6 +78,7 @@ final class NotchWindowController {
         privacyMonitor.onChange = { [weak self] activity in self?.model.privacy = activity }
         networkMonitor.onChange = { [weak self] speed in self?.model.network = speed }
         model.timer.onFinish = { [weak self] in self?.timerFinished() }
+        model.onStopAlarm = { [weak self] in self?.stopAlarm() }
         mediaKeys.onKey = { [weak self] key, fine in self?.handleMediaKey(key, fine: fine) ?? false }
         followIndicatorSettings()
         installMouseMonitors()
@@ -331,29 +332,43 @@ final class NotchWindowController {
         DispatchQueue.main.asyncAfter(deadline: .now() + Self.indicatorDuration, execute: end)
     }
 
-    /// The notch folds down with a ringing bell and a chime; it folds back up after a
-    /// while or when the pointer opens the notch.
+    private var alarmSound: NSSound?
+    private static let alarmDuration = 10.0
+
+    /// Like iOS: the notch folds down with the timer symbol, 0:00 and an X. The alarm
+    /// rings for 10 seconds (unless the timer was silent) or until the X is clicked.
     private func timerFinished() {
         guard !model.isShowingIntro, !model.isShowingAppearancePreview else { return }
-        let minutes = Int((model.timer.lastDuration / 60).rounded())
-        model.finishedTimerLabel = minutes >= 60 && minutes % 60 == 0 ? "\(minutes / 60) h timer"
-            : minutes >= 1 ? "\(minutes) min timer" : "\(Int(model.timer.lastDuration)) s timer"
         if model.state == .open {
             cancelPending()
             setState(.closed)
-            hoverOpenBlocked = true
         }
         peekEnd?.cancel()
         model.isPeeking = false
         model.isTimerFinished = true
-        NSSound(named: "Glass")?.play()
-        DispatchQueue.main.asyncAfter(deadline: .now() + 1.2) { [weak self] in
-            if self?.model.isTimerFinished == true { NSSound(named: "Glass")?.play() }
+        // The X has to be clickable in the closed notch; transparent areas still pass clicks through.
+        panel.ignoresMouseEvents = false
+        alarmSound?.stop()
+        if !model.timer.lastWasSilent, let sound = NSSound(named: "Glass")?.copy() as? NSSound {
+            sound.loops = true
+            sound.play()
+            alarmSound = sound
         }
         timerDoneEnd?.cancel()
-        let end = DispatchWorkItem { [weak self] in self?.model.isTimerFinished = false }
+        let end = DispatchWorkItem { [weak self] in self?.stopAlarm() }
         timerDoneEnd = end
-        DispatchQueue.main.asyncAfter(deadline: .now() + 8, execute: end)
+        DispatchQueue.main.asyncAfter(deadline: .now() + Self.alarmDuration, execute: end)
+    }
+
+    private func stopAlarm() {
+        timerDoneEnd?.cancel()
+        alarmSound?.stop()
+        alarmSound = nil
+        guard model.isTimerFinished else { return }
+        model.isTimerFinished = false
+        panel.ignoresMouseEvents = model.state == .closed
+        // A pointer still over the notch shouldn't open it right after the card folds up.
+        hoverOpenBlocked = true
     }
 
     /// Shows the new song in the closed notch, if turned on. Unlike the shortcut it
@@ -381,6 +396,8 @@ final class NotchWindowController {
 
         switch model.state {
         case .closed:
+            // While the alarm rings the card stays down; only its X (or the timeout) ends it.
+            if model.isTimerFinished { return }
             // Grow the hot zone a little so the very top edge of the screen counts.
             let hotZone = geometry.rect(for: model.currentSize).insetBy(dx: -6, dy: -2)
             guard hotZone.contains(location) else {
@@ -439,8 +456,7 @@ final class NotchWindowController {
         if state == .open {
             peekEnd?.cancel()
             model.isPeeking = false
-            timerDoneEnd?.cancel()
-            model.isTimerFinished = false
+            stopAlarm()
             indicatorEnd?.cancel()
             model.indicator = nil
         } else {
@@ -512,7 +528,7 @@ final class NotchWindowController {
                                                          isCameraOn: kind == "cam" || kind == "both")
                 case "timer" where parts.count == 2:
                     // Starts a timer of N seconds.
-                    if let seconds = Double(parts[1]) { self.model.timer.start(seconds) }
+                    if let seconds = Double(parts[1]) { self.model.timer.start(seconds, silent: self.model.settings.timerSilent) }
                 case "timerpanel":
                     self.model.isTimerPanelVisible.toggle()
                 case "mediakey" where parts.count == 2:

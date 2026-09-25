@@ -12,8 +12,10 @@ final class NotchTimer {
     /// Time left while paused.
     private(set) var pausedRemaining: TimeInterval?
 
-    /// Length of the timer that last finished, for the done card.
-    @ObservationIgnored private(set) var lastDuration: TimeInterval = 0
+    /// Ends without the alarm sound.
+    private(set) var isSilent = false
+    /// Whether the timer that last finished was silent.
+    @ObservationIgnored private(set) var lastWasSilent = false
     @ObservationIgnored var onFinish: (() -> Void)?
     @ObservationIgnored private var finishTimer: Timer?
 
@@ -31,8 +33,9 @@ final class NotchTimer {
         duration > 0 ? remaining(at: date) / duration : 0
     }
 
-    func start(_ seconds: TimeInterval) {
+    func start(_ seconds: TimeInterval, silent: Bool = false) {
         duration = seconds
+        isSilent = silent
         pausedRemaining = nil
         schedule(end: Date().addingTimeInterval(seconds))
     }
@@ -71,7 +74,7 @@ final class NotchTimer {
         finishTimer?.invalidate()
         let timer = Timer(fire: end, interval: 0, repeats: false) { [weak self] _ in
             guard let self else { return }
-            self.lastDuration = self.duration
+            self.lastWasSilent = self.isSilent
             self.cancel()
             self.onFinish?()
         }

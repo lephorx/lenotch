@@ -73,7 +73,7 @@ enum SettingsSection: String, CaseIterable, Identifiable {
     var keywords: [String] {
         switch self {
         case .general: ["open", "hover", "click", "delay", "shortcut", "keyboard", "menu bar", "icon", "login",
-                        "startup", "update", "welcome", "intro", "peek", "what's new", "release notes", "changelog", "volume", "brightness", "indicator", "hud", "accessibility", "microphone", "mic", "privacy", "recording", "network", "download", "upload", "speed"]
+                        "startup", "update", "welcome", "intro", "peek", "what's new", "release notes", "changelog", "volume", "brightness", "indicator", "hud", "accessibility", "microphone", "mic", "privacy", "recording", "network", "download", "upload", "speed", "timer", "alarm", "countdown", "silent"]
         case .look: ["style", "black", "glass", "liquid", "opacity", "transparent", "colour", "color", "gradient",
                      "fade", "battery", "percentage", "look", "appearance", "theme"]
         case .music: ["music", "song", "player", "spotify", "apple music", "youtube", "source", "shuffle", "repeat",
@@ -248,6 +248,15 @@ private struct GeneralSettings: View {
                 Text("Show changes in the notch")
             } footer: {
                 Text("The level appears beside the notch for a moment. Hiding macOS's own indicator needs Accessibility, so Lenotch can handle the volume and brightness keys itself.")
+            }
+            Section {
+                Toggle("Timer button in the notch", isOn: $settings.showTimer)
+                Toggle("Silent timers", isOn: $settings.timerSilent)
+                    .disabled(!settings.showTimer)
+            } header: {
+                Text("Timer")
+            } footer: {
+                Text("Start a timer from the open notch. It counts down beside the notch, and when it ends the notch folds down and the alarm rings for 10 seconds (or until you click ×). Silent timers skip the sound.")
             }
             Section {
                 Toggle("Microphone and camera in use", isOn: $settings.showPrivacyIndicator)
