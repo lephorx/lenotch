@@ -130,27 +130,32 @@ private struct PrivacyOutline: View {
     let glow: Bool
     @State private var bright = false
 
+    /// How far past the notch the line and glow may be drawn.
+    private static let bleed: CGFloat = 24
+
     var body: some View {
         shape.stroke(LinearGradient(colors: colors, startPoint: .leading, endPoint: .trailing),
                      lineWidth: glow ? 5 : 3)
             .blur(radius: glow ? 7 : 0)
             .opacity(bright ? 1 : glow ? 0.45 : 0.6)
+            // Fades out over the top 14 pt (no colour along the screen's top edge) and reaches
+            // past the frame, so the line's outer half and the glow aren't cut off.
             .mask {
-                GeometryReader { proxy in
-                    ZStack {
-                        LinearGradient(stops: [.init(color: .clear, location: 0),
-                                               .init(color: .black, location: min(14 / max(proxy.size.height, 1), 1))],
-                                       startPoint: .top, endPoint: .bottom)
-                            // The glow's blur reaches past the frame; let it show below and beside.
-                            .padding(glow ? -24 : 0)
-                            .padding(.top, glow ? 24 : 0)
-                        if glow {
-                            // Only outside the notch: a see-through glass notch mustn't show it inside.
-                            shape.fill(.black).blendMode(.destinationOut)
-                        }
+                ZStack {
+                    VStack(spacing: 0) {
+                        Color.clear.frame(height: Self.bleed)
+                        LinearGradient(colors: [.clear, .black], startPoint: .top, endPoint: .bottom)
+                            .frame(height: 14)
+                        Color.black
                     }
-                    .compositingGroup()
+                    if glow {
+                        // Only outside the notch: a see-through glass notch mustn't show it inside.
+                        shape.fill(.black).blendMode(.destinationOut)
+                            .padding(Self.bleed)
+                    }
                 }
+                .compositingGroup()
+                .padding(-Self.bleed)
             }
             .allowsHitTesting(false)
             .onAppear {
