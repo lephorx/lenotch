@@ -40,6 +40,8 @@ final class NotchViewModel {
     var isPeeking = false
     /// A volume or brightness change showing beside the closed notch.
     var indicator: SystemIndicator?
+    /// The crypto ticker fills the closed notch while nothing else shows there.
+    var showsCrypto: Bool { settings.showCrypto && !crypto.prices.isEmpty }
     /// Apps using the microphone or camera right now.
     var privacy = PrivacyActivity()
     /// The closed notch shows the mic/camera dots (Lenotch's own camera mirror doesn't count).
@@ -58,6 +60,7 @@ final class NotchViewModel {
     let camera = CameraMirror()
     let calendar: CalendarService
     let weather: WeatherService
+    let crypto: CryptoService
     let aiUsage = AIUsageService()
     /// The AI usage ring under the pointer, for the bubble below the notch.
     private(set) var usageHover: UsageHover?
@@ -86,6 +89,7 @@ final class NotchViewModel {
         self.settings = settings
         self.calendar = CalendarService(settings: settings)
         self.weather = WeatherService(settings: settings)
+        self.crypto = CryptoService(settings: settings)
         self.battery = battery
         self.shelf = shelf
         self.visualizer = visualizer
@@ -212,7 +216,9 @@ final class NotchViewModel {
         if isPeeking, state == .closed { return geometry.peekSize }
         return switch state {
         case .open: openSize(for: visiblePage)
-        case .closed: showsLiveActivity || showsPrivacy ? geometry.liveSize : geometry.closedSize
+        case .closed:
+            showsLiveActivity || showsPrivacy ? geometry.liveSize
+                : showsCrypto ? geometry.indicatorSize : geometry.closedSize
         }
     }
 }

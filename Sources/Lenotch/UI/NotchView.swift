@@ -37,6 +37,11 @@ struct NotchView: View {
             .animation(.spring(response: 0.42, dampingFraction: 0.82), value: model.showsLiveActivity)
             .animation(.spring(response: 0.38, dampingFraction: 0.82), value: model.indicator != nil)
             .animation(.spring(response: 0.42, dampingFraction: 0.82), value: model.showsPrivacy)
+            .animation(.spring(response: 0.42, dampingFraction: 0.82), value: model.showsCrypto)
+            // Turning the ticker on, or picking other coins, fetches right away.
+            .task(id: "\(model.settings.showCrypto)\(model.settings.cryptoCoins)\(model.settings.cryptoCurrency)") {
+                model.crypto.refresh()
+            }
             .animation(.easeInOut(duration: 0.3), value: model.settings.appearance)
             .animation(.easeInOut(duration: 0.25), value: model.backgroundGradient)
             .animation(.easeInOut(duration: 0.6), value: model.accentColor)
@@ -68,6 +73,9 @@ struct NotchView: View {
                 .transition(.opacity)
         } else if model.showsLiveActivity {
             LiveActivityView(model: model)
+                .transition(.opacity)
+        } else if model.showsCrypto {
+            CryptoTickerView(model: model)
                 .transition(.opacity)
         } else {
             Color.clear

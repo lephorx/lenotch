@@ -91,6 +91,11 @@ final class AppSettings {
     var showBrightnessIndicator: Bool { didSet { save(showBrightnessIndicator, "showBrightnessIndicator") } }
     /// Take over the volume/brightness keys so macOS's own indicator doesn't show
     /// (only works once Accessibility is allowed).
+    /// Crypto prices beside the closed notch while nothing is playing.
+    var showCrypto: Bool { didSet { save(showCrypto, "showCrypto") } }
+    /// CoinGecko ids, in catalogue order.
+    var cryptoCoins: [String] { didSet { defaults.set(cryptoCoins, forKey: "cryptoCoins") } }
+    var cryptoCurrency: String { didSet { save(cryptoCurrency, "cryptoCurrency") } }
     /// Show which app uses the microphone or camera beside the closed notch.
     var showPrivacyIndicator: Bool { didSet { save(showPrivacyIndicator, "showPrivacyIndicator") } }
     var hideSystemIndicator: Bool { didSet { save(hideSystemIndicator, "hideSystemIndicator") } }
@@ -204,6 +209,11 @@ final class AppSettings {
         showBrightnessIndicator = bool("showBrightnessIndicator", true)
         hideSystemIndicator = bool("hideSystemIndicator", true)
         showPrivacyIndicator = bool("showPrivacyIndicator", true)
+        showCrypto = bool("showCrypto", false)
+        cryptoCoins = defaults.stringArray(forKey: "cryptoCoins") ?? ["bitcoin", "ethereum"]
+        cryptoCurrency = defaults.string(forKey: "cryptoCurrency")
+            ?? (["EUR", "CHF", "GBP", "JPY"].contains(Locale.current.currency?.identifier ?? "")
+                ? Locale.current.currency!.identifier.lowercased() : "usd")
         expandedCalendarStyle = defaults.string(forKey: "expandedCalendarStyle")
             .flatMap(ExpandedCalendarStyle.init) ?? .month
         weatherPlace = defaults.data(forKey: "weatherPlace").flatMap { try? JSONDecoder().decode(WeatherPlace.self, from: $0) }

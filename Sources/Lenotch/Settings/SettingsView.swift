@@ -5,7 +5,7 @@ import SwiftUI
 /// Settings pages, grouped in the sidebar by what you want to change: how the notch
 /// behaves and looks, each feature with its own page, and privacy.
 enum SettingsSection: String, CaseIterable, Identifiable {
-    case general, look, music, calendar, weather, shelf, camera, aiUsage, permissions
+    case general, look, music, calendar, weather, crypto, shelf, camera, aiUsage, permissions
 
     enum Group: String, CaseIterable {
         case notch = "Notch"
@@ -30,6 +30,7 @@ enum SettingsSection: String, CaseIterable, Identifiable {
         case .music: "Music"
         case .calendar: "Calendar"
         case .weather: "Weather"
+        case .crypto: "Crypto"
         case .shelf: "Shelf"
         case .camera: "Camera"
         case .aiUsage: "AI Usage"
@@ -44,6 +45,7 @@ enum SettingsSection: String, CaseIterable, Identifiable {
         case .music: "music.note"
         case .calendar: "calendar"
         case .weather: "cloud.sun.fill"
+        case .crypto: "bitcoinsign"
         case .shelf: "tray.full.fill"
         case .camera: "camera.fill"
         case .aiUsage: "sparkles"
@@ -59,6 +61,7 @@ enum SettingsSection: String, CaseIterable, Identifiable {
         case .music: .pink
         case .calendar: .red
         case .weather: .cyan
+        case .crypto: .yellow
         case .shelf: .blue
         case .camera: .teal
         case .aiUsage: .orange
@@ -78,6 +81,7 @@ enum SettingsSection: String, CaseIterable, Identifiable {
                       "progress", "visualizer", "audio", "sound", "peek", "track change"]
         case .calendar: ["calendar", "events", "month", "day strip", "reminders", "schedule", "date"]
         case .weather: ["weather", "temperature", "city", "location", "celsius", "fahrenheit", "forecast"]
+        case .crypto: ["crypto", "bitcoin", "ethereum", "price", "coin", "ticker", "btc", "eth", "stocks"]
         case .shelf: ["shelf", "files", "drop", "drag", "airdrop", "share"]
         case .camera: ["camera", "mirror", "video", "face"]
         case .aiUsage: ["ai", "usage", "claude", "codex", "cursor", "copilot", "limits", "provider", "tokens"]
@@ -164,6 +168,8 @@ struct SettingsView: View {
             CalendarSettings(settings: settings, permissions: permissions)
         case .weather:
             Form { WeatherSection(settings: settings) }.formStyle(.grouped)
+        case .crypto:
+            CryptoSettings(settings: settings)
         case .shelf:
             ShelfSettings(settings: settings, shelf: shelf)
         case .camera:
