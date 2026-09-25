@@ -44,7 +44,7 @@ final class NotchViewModel {
     var showsCrypto: Bool { settings.showCrypto && !crypto.prices.isEmpty }
     /// Apps using the microphone or camera right now.
     var privacy = PrivacyActivity()
-    /// The closed notch shows the mic/camera dots (Lenotch's own camera mirror doesn't count).
+    /// The notch gets an orange/green outline (Lenotch's own camera mirror doesn't count).
     var showsPrivacy: Bool {
         settings.showPrivacyIndicator && (privacy.isMicOn || (privacy.isCameraOn && !isMirrorVisible))
     }
@@ -217,7 +217,7 @@ final class NotchViewModel {
         return switch state {
         case .open: openSize(for: visiblePage)
         case .closed:
-            showsLiveActivity || showsPrivacy ? geometry.liveSize
+            showsLiveActivity ? geometry.liveSize
                 : showsCrypto ? geometry.indicatorSize : geometry.closedSize
         }
     }

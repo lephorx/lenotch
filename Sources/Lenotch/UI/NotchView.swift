@@ -28,6 +28,14 @@ struct NotchView: View {
                                     && model.settings.showMusic && model.settings.gradient(for: model.settings.appearance).bottomFollowsMusic
                                     ? model.accentColor : nil)
             }
+            // Microphone (orange) or camera (green) in use: a thin outline around the notch.
+            // Stroked on the edge and clipped, so the line sits just inside it.
+            .overlay {
+                if let color = privacyColor {
+                    PrivacyOutline(shape: shape, color: color)
+                        .transition(.opacity)
+                }
+            }
             .clipShape(shape)
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
             .animation(.spring(response: 0.42, dampingFraction: 0.82), value: model.state)
@@ -46,6 +54,11 @@ struct NotchView: View {
             .animation(.easeInOut(duration: 0.25), value: model.backgroundGradient)
             .animation(.easeInOut(duration: 0.6), value: model.accentColor)
             .environment(\.colorScheme, .dark)
+    }
+
+    private var privacyColor: Color? {
+        guard model.showsPrivacy else { return nil }
+        return model.privacy.isMicOn ? .orange : .green
     }
 
     @ViewBuilder
@@ -68,9 +81,6 @@ struct NotchView: View {
         } else if model.isPeeking, let track = model.media.track {
             PeekView(model: model, track: track)
                 .transition(.opacity.combined(with: .scale(0.95, anchor: .top)))
-        } else if model.showsPrivacy {
-            PrivacyView(model: model)
-                .transition(.opacity)
         } else if model.showsLiveActivity {
             LiveActivityView(model: model)
                 .transition(.opacity)
@@ -80,5 +90,22 @@ struct NotchView: View {
         } else {
             Color.clear
         }
+    }
+}
+
+/// The outline shown while the microphone or camera is in use, gently pulsing.
+private struct PrivacyOutline: View {
+    let shape: NotchShape
+    let color: Color
+    @State private var bright = false
+
+    var body: some View {
+        shape.stroke(color, lineWidth: 3)
+            .shadow(color: color.opacity(0.8), radius: 3)
+            .opacity(bright ? 1 : 0.6)
+            .allowsHitTesting(false)
+            .onAppear {
+                withAnimation(.easeInOut(duration: 1.4).repeatForever(autoreverses: true)) { bright = true }
+            }
     }
 }

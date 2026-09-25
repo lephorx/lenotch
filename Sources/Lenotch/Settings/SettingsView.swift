@@ -252,7 +252,7 @@ private struct GeneralSettings: View {
             Section {
                 Toggle("Microphone and camera in use", isOn: $settings.showPrivacyIndicator)
             } footer: {
-                Text("Shows the app's icon with an orange (microphone) or green (camera) dot beside the notch. No permission needed.")
+                Text("Draws an orange outline around the notch while an app uses the microphone, or a green one for the camera. No permission needed.")
             }
             Section {
                 Toggle("Show icon in the menu bar", isOn: $settings.showMenuBarIcon)
