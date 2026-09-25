@@ -50,12 +50,35 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
         updateVisualizer()
 
+        let hadCompletedOnboarding = settings.hasCompletedOnboarding
         if !settings.hasCompletedOnboarding {
             // The intro plays once the setup is done, in the chosen style.
             showOnboarding()
         } else if !settings.hasPlayedIntro {
             settings.hasPlayedIntro = true
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) { [weak self] in self?.playIntro() }
+        }
+
+        // After an update (not a fresh install), show what changed once.
+        if let version = Self.version, version != settings.lastSeenVersion {
+            settings.lastSeenVersion = version
+            if hadCompletedOnboarding {
+                DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) { [weak self] in self?.showWhatsNew() }
+            }
+        }
+    }
+
+    /// The release version (e.g. "2.8"); nil for local builds, which aren't released.
+    private static var version: String? {
+        let info = Bundle.main.infoDictionary
+        guard info?["LenotchRelease"] as? Bool == true else { return nil }
+        return info?["CFBundleShortVersionString"] as? String
+    }
+
+    func showWhatsNew() {
+        guard let version = Self.version else { return }
+        windows.show(id: "whatsNew", title: "What's New") {
+            WhatsNewView(version: version) { [weak self] in self?.windows.close(id: "whatsNew") }
         }
     }
 
@@ -89,6 +112,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             SettingsView(settings: settings, shelf: shelf, permissions: permissions,
                          updater: updater,
                          showOnboarding: { [weak self] in self?.showOnboarding() },
+                         showWhatsNew: { [weak self] in self?.showWhatsNew() },
                          playIntro: { [weak self] in self?.playIntro() })
         }
     }

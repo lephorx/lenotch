@@ -38,6 +38,24 @@ final class NotchViewModel {
     var isShowingAppearancePreview = false
     /// Briefly showing the current song under the closed notch.
     var isPeeking = false
+    /// A volume or brightness change showing beside the closed notch.
+    var indicator: SystemIndicator?
+    let timer = NotchTimer()
+    /// The timer presets/controls cover the open notch's page.
+    var isTimerPanelVisible = false
+    /// A timer just ended: the notch folds down with a ringing bell.
+    var isTimerFinished = false
+    /// Stops the ringing alarm (the done card's X).
+    @ObservationIgnored var onStopAlarm: (() -> Void)?
+    /// Transfer speed while a download or upload runs (nil when quiet).
+    var network: NetworkMonitor.Speed?
+    var showsNetwork: Bool { settings.showNetworkSpeed && network != nil }
+    /// The crypto ticker fills the closed notch while nothing else shows there.
+    var showsCrypto: Bool { settings.showCrypto && !crypto.prices.isEmpty }
+    /// Apps using the microphone or camera right now.
+    var privacy = PrivacyActivity()
+    /// The notch gets an orange (mic) and/or green (camera) outline.
+    var showsPrivacy: Bool { settings.showPrivacyIndicator && !privacy.isEmpty }
     var selectedPage: NotchPage = .player
     var geometry: NotchGeometry
     /// Set while the user drags the progress bar so the notch does not close mid-scrub.
@@ -50,6 +68,7 @@ final class NotchViewModel {
     let camera = CameraMirror()
     let calendar: CalendarService
     let weather: WeatherService
+    let crypto: CryptoService
     let aiUsage = AIUsageService()
     /// The AI usage ring under the pointer, for the bubble below the notch.
     private(set) var usageHover: UsageHover?
@@ -78,6 +97,7 @@ final class NotchViewModel {
         self.settings = settings
         self.calendar = CalendarService(settings: settings)
         self.weather = WeatherService(settings: settings)
+        self.crypto = CryptoService(settings: settings)
         self.battery = battery
         self.shelf = shelf
         self.visualizer = visualizer
@@ -179,6 +199,10 @@ final class NotchViewModel {
 
     /// Switches pages with a slide in the matching direction.
     func select(_ page: NotchPage) {
+        // Choosing a tab leaves the timer panel.
+        if isTimerPanelVisible {
+            withAnimation(Self.pageSpring) { isTimerPanelVisible = false }
+        }
         guard page != visiblePage else { return }
         // Set the direction first and switch on the next run-loop turn, so the
         // outgoing page already knows which way to leave.
@@ -200,10 +224,15 @@ final class NotchViewModel {
 
     var currentSize: CGSize {
         if isShowingIntro || isShowingAppearancePreview { return geometry.introSize }
+        if isTimerFinished, state == .closed { return geometry.timerDoneSize }
+        if indicator != nil, state == .closed { return geometry.indicatorSize }
         if isPeeking, state == .closed { return geometry.peekSize }
         return switch state {
         case .open: openSize(for: visiblePage)
-        case .closed: showsLiveActivity ? geometry.liveSize : geometry.closedSize
+        case .closed:
+            timer.isActive ? geometry.timerSize
+                : showsLiveActivity ? geometry.liveSize
+                : showsNetwork || showsCrypto ? geometry.indicatorSize : geometry.closedSize
         }
     }
 }

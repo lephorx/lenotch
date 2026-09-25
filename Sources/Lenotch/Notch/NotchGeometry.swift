@@ -34,6 +34,23 @@ struct NotchGeometry: Equatable {
         CGSize(width: notchSize.width + 2 * (notchSize.height + 12), height: notchSize.height)
     }
 
+    /// Volume or brightness level on both sides of the closed notch.
+    static let indicatorSideWidth: CGFloat = 110
+    var indicatorSize: CGSize {
+        CGSize(width: notchSize.width + 2 * Self.indicatorSideWidth, height: notchSize.height)
+    }
+
+    /// A running timer (with the music, when playing) on both sides of the closed notch.
+    static let timerSideWidth: CGFloat = 92
+    var timerSize: CGSize {
+        CGSize(width: notchSize.width + 2 * Self.timerSideWidth, height: notchSize.height)
+    }
+
+    /// The card the notch folds down into when a timer ends.
+    var timerDoneSize: CGSize {
+        CGSize(width: notchSize.width + 200, height: notchSize.height + 64)
+    }
+
     /// The card that drops out of the closed notch to show the current song.
     var peekSize: CGSize {
         CGSize(width: notchSize.width + 240, height: notchSize.height + 58)

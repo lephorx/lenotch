@@ -25,6 +25,15 @@ final class NotchWindowController {
     /// elsewhere, or the pointer entering and then leaving the notch.
     private var openedByKeyboard = false
     private var peekEnd: DispatchWorkItem?
+    private let indicators = SystemIndicators()
+    private let mediaKeys = MediaKeyTap()
+    private let privacyMonitor = PrivacyMonitor()
+    private let networkMonitor = NetworkMonitor()
+    /// Waits for Accessibility to be allowed in System Settings, then starts the key tap.
+    private var accessibilityWait: Timer?
+    private var indicatorEnd: DispatchWorkItem?
+    private var timerDoneEnd: DispatchWorkItem?
+    private static let indicatorDuration = 1.6
     /// Horizontal finger travel (points) that counts as a tab swipe.
     private static let swipeThreshold: CGFloat = 60
 
@@ -58,7 +67,20 @@ final class NotchWindowController {
         tooltipPanel.orderFrontRegardless()
         model.onUsageHoverChange = { [weak self] in self?.positionTooltip() }
         model.onOpenSizeChange = { [weak self] in self?.positionMirror() }
+        media.onTrackChange = { [weak self] in
+            // After the current update, so the peek shows the new song's details.
+            DispatchQueue.main.async { self?.peekForTrackChange() }
+        }
 
+        indicators.onChange = { [weak self] indicator in
+            DispatchQueue.main.async { self?.showIndicator(indicator) }
+        }
+        privacyMonitor.onChange = { [weak self] activity in self?.model.privacy = activity }
+        networkMonitor.onChange = { [weak self] speed in self?.model.network = speed }
+        model.timer.onFinish = { [weak self] in self?.timerFinished() }
+        model.onStopAlarm = { [weak self] in self?.stopAlarm() }
+        mediaKeys.onKey = { [weak self] key, fine in self?.handleMediaKey(key, fine: fine) ?? false }
+        followIndicatorSettings()
         installMouseMonitors()
         #if DEBUG
         installDebugHooks()
@@ -255,6 +277,113 @@ final class NotchWindowController {
         DispatchQueue.main.asyncAfter(deadline: .now() + Self.peekDuration, execute: end)
     }
 
+    /// Starts or stops watching volume and brightness as their switches change.
+    private func followIndicatorSettings() {
+        let settings = model.settings
+        withObservationTracking {
+            indicators.watchesVolume = settings.showVolumeIndicator
+            indicators.watchesBrightness = settings.showBrightnessIndicator
+            mediaKeys.handlesVolume = settings.hideSystemIndicator && settings.showVolumeIndicator
+            mediaKeys.handlesBrightness = settings.hideSystemIndicator && settings.showBrightnessIndicator
+            updateMediaKeyTap()
+            privacyMonitor.isEnabled = settings.showPrivacyIndicator
+            networkMonitor.isEnabled = settings.showNetworkSpeed
+        } onChange: { [weak self] in
+            DispatchQueue.main.async { self?.followIndicatorSettings() }
+        }
+    }
+
+    private func updateMediaKeyTap() {
+        let wanted = mediaKeys.handlesVolume || mediaKeys.handlesBrightness
+        guard wanted else {
+            mediaKeys.stop()
+            accessibilityWait?.invalidate()
+            accessibilityWait = nil
+            return
+        }
+        guard !mediaKeys.start(), accessibilityWait == nil else { return }
+        accessibilityWait = Timer.scheduledTimer(withTimeInterval: 2, repeats: true) { [weak self] timer in
+            guard let self, self.mediaKeys.start() else { return }
+            timer.invalidate()
+            self.accessibilityWait = nil
+        }
+    }
+
+    /// A volume or brightness key taken over from macOS. Steps match macOS: 16 per
+    /// full range, or 64 with Option+Shift.
+    private func handleMediaKey(_ key: MediaKeyTap.Key, fine: Bool) -> Bool {
+        let step = fine ? 1.0 / 64 : 1.0 / 16
+        return switch key {
+        case .volumeUp: indicators.adjustVolume(by: step)
+        case .volumeDown: indicators.adjustVolume(by: -step)
+        case .mute: indicators.toggleMute()
+        case .brightnessUp: indicators.adjustBrightness(by: step)
+        case .brightnessDown: indicators.adjustBrightness(by: -step)
+        }
+    }
+
+    /// Volume or brightness beside the closed notch; hides shortly after the last change.
+    private func showIndicator(_ indicator: SystemIndicator) {
+        guard model.state == .closed, !model.isShowingIntro, !model.isShowingAppearancePreview else { return }
+        model.indicator = indicator
+        indicatorEnd?.cancel()
+        let end = DispatchWorkItem { [weak self] in self?.model.indicator = nil }
+        indicatorEnd = end
+        DispatchQueue.main.asyncAfter(deadline: .now() + Self.indicatorDuration, execute: end)
+    }
+
+    private var alarmSound: NSSound?
+    private static let alarmDuration = 10.0
+
+    /// Like iOS: the notch folds down with the timer symbol, 0:00 and an X. The alarm
+    /// rings for 10 seconds (unless the timer was silent) or until the X is clicked.
+    private func timerFinished() {
+        guard !model.isShowingIntro, !model.isShowingAppearancePreview else { return }
+        if model.state == .open {
+            cancelPending()
+            setState(.closed)
+        }
+        peekEnd?.cancel()
+        model.isPeeking = false
+        model.isTimerFinished = true
+        // The X has to be clickable in the closed notch; transparent areas still pass clicks through.
+        panel.ignoresMouseEvents = false
+        alarmSound?.stop()
+        if !model.timer.lastWasSilent, let sound = NSSound(named: "Glass")?.copy() as? NSSound {
+            sound.loops = true
+            sound.play()
+            alarmSound = sound
+        }
+        timerDoneEnd?.cancel()
+        let end = DispatchWorkItem { [weak self] in self?.stopAlarm() }
+        timerDoneEnd = end
+        DispatchQueue.main.asyncAfter(deadline: .now() + Self.alarmDuration, execute: end)
+    }
+
+    private func stopAlarm() {
+        timerDoneEnd?.cancel()
+        alarmSound?.stop()
+        alarmSound = nil
+        guard model.isTimerFinished else { return }
+        model.isTimerFinished = false
+        panel.ignoresMouseEvents = model.state == .closed
+        // A pointer still over the notch shouldn't open it right after the card folds up.
+        hoverOpenBlocked = true
+    }
+
+    /// Shows the new song in the closed notch, if turned on. Unlike the shortcut it
+    /// never closes an open notch, and a showing peek just stays up longer.
+    private func peekForTrackChange() {
+        guard model.settings.peekOnTrackChange, model.state == .closed,
+              !model.isShowingIntro, !model.isShowingAppearancePreview,
+              model.media.track != nil else { return }
+        peekEnd?.cancel()
+        model.isPeeking = true
+        let end = DispatchWorkItem { [weak self] in self?.model.isPeeking = false }
+        peekEnd = end
+        DispatchQueue.main.asyncAfter(deadline: .now() + model.settings.trackPeekDuration, execute: end)
+    }
+
     private func handle(_ event: NSEvent) {
         guard !model.isShowingIntro, !model.isShowingAppearancePreview else { return }
         let location = NSEvent.mouseLocation
@@ -267,6 +396,8 @@ final class NotchWindowController {
 
         switch model.state {
         case .closed:
+            // While the alarm rings the card stays down; only its X (or the timeout) ends it.
+            if model.isTimerFinished { return }
             // Grow the hot zone a little so the very top edge of the screen counts.
             let hotZone = geometry.rect(for: model.currentSize).insetBy(dx: -6, dy: -2)
             guard hotZone.contains(location) else {
@@ -325,9 +456,13 @@ final class NotchWindowController {
         if state == .open {
             peekEnd?.cancel()
             model.isPeeking = false
+            stopAlarm()
+            indicatorEnd?.cancel()
+            model.indicator = nil
         } else {
             openedByKeyboard = false
             model.setUsageHover(nil)
+            model.isTimerPanelVisible = false
         }
         if state == .closed, model.isMirrorVisible {
             // The camera closes together with the notch.
@@ -385,6 +520,22 @@ final class NotchWindowController {
                         while let current = view { chain.append(String(describing: type(of: current))); view = current.superview }
                         NSLog("Lenotch debug: hit (\(x), \(y)) -> \(chain.joined(separator: " < "))")
                     }
+                case "privacy" where parts.count >= 2:
+                    // Fakes mic/camera use: privacy mic|cam|both|off [bundleID]
+                    let kind = parts[1]
+                    self.model.privacy = PrivacyActivity(micApps: parts.count > 2 ? [parts[2]] : [],
+                                                         isMicOn: kind == "mic" || kind == "both",
+                                                         isCameraOn: kind == "cam" || kind == "both")
+                case "timer" where parts.count == 2:
+                    // Starts a timer of N seconds.
+                    if let seconds = Double(parts[1]) { self.model.timer.start(seconds, silent: self.model.settings.timerSilent) }
+                case "timerpanel":
+                    self.model.isTimerPanelVisible.toggle()
+                case "mediakey" where parts.count == 2:
+                    // Runs a taken-over key: volup, voldown, mute, brightup, brightdown.
+                    let keys: [String: MediaKeyTap.Key] = ["volup": .volumeUp, "voldown": .volumeDown, "mute": .mute,
+                                                           "brightup": .brightnessUp, "brightdown": .brightnessDown]
+                    if let key = keys[parts[1]] { NSLog("Lenotch debug: mediakey \(parts[1]) -> \(self.handleMediaKey(key, fine: false))") }
                 case "page" where parts.count == 2:
                     if let index = Int(parts[1]), self.model.pages.indices.contains(index) {
                         self.model.selectedPage = self.model.pages[index]
@@ -421,7 +572,7 @@ final class NotchWindowController {
                 }
             }
             let page = self.model.visiblePage.rawValue
-            let status = "state=\(self.model.state) intro=\(self.model.isShowingIntro) page=\(page)/\(self.model.pages.count) mirror=\(self.model.isMirrorVisible) camera=\(self.model.camera.status)\n"
+            let status = "state=\(self.model.state) intro=\(self.model.isShowingIntro) page=\(page)/\(self.model.pages.count) mirror=\(self.model.isMirrorVisible) camera=\(self.model.camera.status) keytap=\(self.mediaKeys.isRunning) network=\(String(describing: self.model.network)) privacy=\(self.model.privacy)\n"
             try? status.write(toFile: output, atomically: true, encoding: .utf8)
         }
     }

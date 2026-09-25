@@ -34,6 +34,8 @@ if [ "${1:-}" = dmg ]; then
 fi
 if [ -n "${VERSION:-}" ]; then
   /usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString $VERSION" "$APP/Contents/Info.plist"
+  # Only released versions show What's New after an update.
+  /usr/libexec/PlistBuddy -c "Add :LenotchRelease bool true" "$APP/Contents/Info.plist"
 fi
 if [ -n "${BUILD:-}" ]; then
   /usr/libexec/PlistBuddy -c "Set :CFBundleVersion $BUILD" "$APP/Contents/Info.plist"

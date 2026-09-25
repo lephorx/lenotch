@@ -2,14 +2,18 @@ import ServiceManagement
 import Sparkle
 import SwiftUI
 
-/// Settings pages, grouped in the sidebar by what you want to change: how the notch
-/// behaves and looks, each feature with its own page, and privacy.
+/// Settings pages, grouped in the sidebar by where things are: the notch itself, the
+/// features inside the open notch, what shows beside the closed notch, and privacy.
 enum SettingsSection: String, CaseIterable, Identifiable {
-    case general, look, music, calendar, weather, shelf, camera, aiUsage, permissions
+    case general, look
+    case music, calendar, weather, shelf, timer, camera, aiUsage
+    case volumeBrightness, micCamera, network, crypto
+    case permissions
 
     enum Group: String, CaseIterable {
         case notch = "Notch"
         case features = "Features"
+        case besideNotch = "Beside the Notch"
         case privacy = "Privacy"
     }
 
@@ -18,8 +22,9 @@ enum SettingsSection: String, CaseIterable, Identifiable {
     var group: Group {
         switch self {
         case .general, .look: .notch
+        case .music, .calendar, .weather, .shelf, .timer, .camera, .aiUsage: .features
+        case .volumeBrightness, .micCamera, .network, .crypto: .besideNotch
         case .permissions: .privacy
-        default: .features
         }
     }
 
@@ -31,8 +36,13 @@ enum SettingsSection: String, CaseIterable, Identifiable {
         case .calendar: "Calendar"
         case .weather: "Weather"
         case .shelf: "Shelf"
-        case .camera: "Camera"
+        case .timer: "Timer"
+        case .camera: "Camera Mirror"
         case .aiUsage: "AI Usage"
+        case .volumeBrightness: "Volume & Brightness"
+        case .micCamera: "Mic & Camera"
+        case .network: "Network"
+        case .crypto: "Crypto"
         case .permissions: "Permissions"
         }
     }
@@ -45,8 +55,13 @@ enum SettingsSection: String, CaseIterable, Identifiable {
         case .calendar: "calendar"
         case .weather: "cloud.sun.fill"
         case .shelf: "tray.full.fill"
+        case .timer: "timer"
         case .camera: "camera.fill"
         case .aiUsage: "sparkles"
+        case .volumeBrightness: "speaker.wave.2.fill"
+        case .micCamera: "mic.fill"
+        case .network: "arrow.up.arrow.down"
+        case .crypto: "bitcoinsign"
         case .permissions: "hand.raised.fill"
         }
     }
@@ -60,8 +75,13 @@ enum SettingsSection: String, CaseIterable, Identifiable {
         case .calendar: .red
         case .weather: .cyan
         case .shelf: .blue
+        case .timer: .orange
         case .camera: .teal
-        case .aiUsage: .orange
+        case .aiUsage: .purple
+        case .volumeBrightness: .blue
+        case .micCamera: .orange
+        case .network: .mint
+        case .crypto: .yellow
         case .permissions: .green
         }
     }
@@ -70,17 +90,24 @@ enum SettingsSection: String, CaseIterable, Identifiable {
     var keywords: [String] {
         switch self {
         case .general: ["open", "hover", "click", "delay", "shortcut", "keyboard", "menu bar", "icon", "login",
-                        "startup", "update", "welcome", "intro", "peek"]
+                        "startup", "update", "welcome", "intro", "peek", "what's new", "release notes", "changelog",
+                        "help", "swipe"]
         case .look: ["style", "black", "glass", "liquid", "opacity", "transparent", "colour", "color", "gradient",
                      "fade", "battery", "percentage", "look", "appearance", "theme"]
         case .music: ["music", "song", "player", "spotify", "apple music", "youtube", "source", "shuffle", "repeat",
                       "favorite", "like", "album", "art", "cover", "colour", "color", "equalizer", "bars",
-                      "progress", "visualizer", "audio", "sound"]
+                      "progress", "visualizer", "audio", "sound", "peek", "track change"]
         case .calendar: ["calendar", "events", "month", "day strip", "reminders", "schedule", "date"]
         case .weather: ["weather", "temperature", "city", "location", "celsius", "fahrenheit", "forecast"]
         case .shelf: ["shelf", "files", "drop", "drag", "airdrop", "share"]
+        case .timer: ["timer", "alarm", "countdown", "silent", "stopwatch"]
         case .camera: ["camera", "mirror", "video", "face"]
         case .aiUsage: ["ai", "usage", "claude", "codex", "cursor", "copilot", "limits", "provider", "tokens"]
+        case .volumeBrightness: ["volume", "brightness", "indicator", "hud", "osd", "keys", "accessibility", "sound"]
+        case .micCamera: ["microphone", "mic", "camera", "privacy", "recording", "outline", "glow", "orange", "green",
+                          "call", "in use"]
+        case .network: ["network", "download", "upload", "speed", "internet", "wifi", "transfer"]
+        case .crypto: ["crypto", "bitcoin", "ethereum", "price", "coin", "ticker", "btc", "eth", "stocks"]
         case .permissions: ["permission", "privacy", "allow", "access", "security"]
         }
     }
@@ -98,6 +125,7 @@ struct SettingsView: View {
     let permissions: PermissionCenter
     let updater: SPUUpdater
     let showOnboarding: () -> Void
+    let showWhatsNew: () -> Void
     let playIntro: () -> Void
 
     /// Page shown when the window opens (debug hooks can pick another).
@@ -154,7 +182,7 @@ struct SettingsView: View {
     private var detail: some View {
         switch section ?? .general {
         case .general:
-            GeneralSettings(settings: settings, updater: updater, showOnboarding: showOnboarding, playIntro: playIntro)
+            GeneralSettings(settings: settings, updater: updater, showOnboarding: showOnboarding, showWhatsNew: showWhatsNew, playIntro: playIntro)
         case .look:
             LookSettings(settings: settings)
         case .music:
@@ -176,6 +204,16 @@ struct SettingsView: View {
             .formStyle(.grouped)
         case .aiUsage:
             AIUsageSettings(settings: settings)
+        case .timer:
+            TimerSettings(settings: settings)
+        case .volumeBrightness:
+            VolumeBrightnessSettings(settings: settings, permissions: permissions)
+        case .micCamera:
+            MicCameraSettings(settings: settings)
+        case .network:
+            NetworkSettings(settings: settings)
+        case .crypto:
+            CryptoSettings(settings: settings)
         case .permissions:
             Form {
                 Section {
@@ -196,6 +234,7 @@ private struct GeneralSettings: View {
     @Bindable var settings: AppSettings
     let updater: SPUUpdater
     let showOnboarding: () -> Void
+    let showWhatsNew: () -> Void
     let playIntro: () -> Void
 
     @State private var launchAtLogin = SMAppService.mainApp.status == .enabled
@@ -245,6 +284,9 @@ private struct GeneralSettings: View {
                 ))
             }
             Section("Help") {
+                LabeledContent("What's new in this version") {
+                    Button("Show…", action: showWhatsNew)
+                }
                 LabeledContent("Welcome screen") {
                     Button("Show Again…", action: showOnboarding)
                 }
@@ -407,6 +449,21 @@ private struct MusicSettings: View {
                     if let footer = sourceFooter {
                         Text(footer)
                     }
+                }
+                Section {
+                    Toggle("Peek when the song changes", isOn: $settings.peekOnTrackChange)
+                    if settings.peekOnTrackChange {
+                        LabeledContent("Show for") {
+                            HStack {
+                                Slider(value: $settings.trackPeekDuration, in: 1...10, step: 0.5)
+                                Text("\(settings.trackPeekDuration, format: .number.precision(.fractionLength(1))) s")
+                                    .monospacedDigit()
+                                    .frame(width: 44, alignment: .trailing)
+                            }
+                        }
+                    }
+                } footer: {
+                    Text("Briefly shows the new song's cover and title in the closed notch.")
                 }
                 Section {
                     Toggle("Shuffle and repeat buttons", isOn: $settings.showShuffleRepeat)

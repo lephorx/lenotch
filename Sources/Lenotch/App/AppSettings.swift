@@ -58,6 +58,8 @@ final class AppSettings {
     // MARK: Setup
     var hasCompletedOnboarding: Bool { didSet { save(hasCompletedOnboarding, "hasCompletedOnboarding") } }
     var hasPlayedIntro: Bool { didSet { save(hasPlayedIntro, "hasPlayedIntro") } }
+    /// The version whose What's New was last shown (or that was first installed).
+    var lastSeenVersion: String? { didSet { defaults.set(lastSeenVersion, forKey: "lastSeenVersion") } }
 
     // MARK: General
     var openMode: OpenMode { didSet { save(openMode.rawValue, "openMode") } }
@@ -79,6 +81,32 @@ final class AppSettings {
     var showCalendar: Bool { didSet { save(showCalendar, "showCalendar") } }
     /// The music player in the first tab; off leaves the calendar (or the weather home view).
     var showMusic: Bool { didSet { save(showMusic, "showMusic") } }
+    /// Briefly show the new song in the closed notch when the track changes.
+    var peekOnTrackChange: Bool { didSet { save(peekOnTrackChange, "peekOnTrackChange") } }
+    /// Seconds the new song stays in the notch after a track change.
+    var trackPeekDuration: Double { didSet { save(trackPeekDuration, "trackPeekDuration") } }
+    /// Show volume changes beside the notch.
+    var showVolumeIndicator: Bool { didSet { save(showVolumeIndicator, "showVolumeIndicator") } }
+    /// Show brightness changes beside the notch.
+    var showBrightnessIndicator: Bool { didSet { save(showBrightnessIndicator, "showBrightnessIndicator") } }
+    /// Take over the volume/brightness keys so macOS's own indicator doesn't show
+    /// (only works once Accessibility is allowed).
+    /// The timer button in the open notch's header (off by default).
+    var showTimer: Bool { didSet { save(showTimer, "showTimer") } }
+    /// Start timers without the alarm sound.
+    var timerSilent: Bool { didSet { save(timerSilent, "timerSilent") } }
+    /// Download/upload speed beside the closed notch while a big transfer runs.
+    var showNetworkSpeed: Bool { didSet { save(showNetworkSpeed, "showNetworkSpeed") } }
+    /// Crypto prices beside the closed notch while nothing is playing.
+    var showCrypto: Bool { didSet { save(showCrypto, "showCrypto") } }
+    /// CoinGecko ids, in catalogue order.
+    var cryptoCoins: [String] { didSet { defaults.set(cryptoCoins, forKey: "cryptoCoins") } }
+    var cryptoCurrency: String { didSet { save(cryptoCurrency, "cryptoCurrency") } }
+    /// Show which app uses the microphone or camera beside the closed notch.
+    var showPrivacyIndicator: Bool { didSet { save(showPrivacyIndicator, "showPrivacyIndicator") } }
+    /// The mic/camera outline also glows outside the notch.
+    var privacyGlow: Bool { didSet { save(privacyGlow, "privacyGlow") } }
+    var hideSystemIndicator: Bool { didSet { save(hideSystemIndicator, "hideSystemIndicator") } }
     var expandedCalendarStyle: ExpandedCalendarStyle {
         didSet { save(expandedCalendarStyle.rawValue, "expandedCalendarStyle") }
     }
@@ -169,6 +197,7 @@ final class AppSettings {
 
         hasCompletedOnboarding = bool("hasCompletedOnboarding", false)
         hasPlayedIntro = bool("hasPlayedIntro", false)
+        lastSeenVersion = defaults.string(forKey: "lastSeenVersion")
         openMode = defaults.string(forKey: "openMode").flatMap(OpenMode.init) ?? .hover
         func shortcut(_ key: String, _ fallback: KeyShortcut) -> KeyShortcut? {
             guard let data = defaults.data(forKey: key) else { return fallback }
@@ -182,6 +211,21 @@ final class AppSettings {
         showMenuBarIcon = bool("showMenuBarIcon", true)
         showCalendar = bool("showCalendar", true)
         showMusic = bool("showMusic", true)
+        peekOnTrackChange = bool("peekOnTrackChange", true)
+        trackPeekDuration = defaults.object(forKey: "trackPeekDuration") as? Double ?? 3
+        showVolumeIndicator = bool("showVolumeIndicator", true)
+        showBrightnessIndicator = bool("showBrightnessIndicator", true)
+        hideSystemIndicator = bool("hideSystemIndicator", true)
+        showPrivacyIndicator = bool("showPrivacyIndicator", true)
+        privacyGlow = bool("privacyGlow", false)
+        showCrypto = bool("showCrypto", false)
+        showNetworkSpeed = bool("showNetworkSpeed", true)
+        showTimer = bool("showTimer", false)
+        timerSilent = bool("timerSilent", false)
+        cryptoCoins = defaults.stringArray(forKey: "cryptoCoins") ?? ["bitcoin", "ethereum"]
+        cryptoCurrency = defaults.string(forKey: "cryptoCurrency")
+            ?? (["EUR", "CHF", "GBP", "JPY"].contains(Locale.current.currency?.identifier ?? "")
+                ? Locale.current.currency!.identifier.lowercased() : "usd")
         expandedCalendarStyle = defaults.string(forKey: "expandedCalendarStyle")
             .flatMap(ExpandedCalendarStyle.init) ?? .month
         weatherPlace = defaults.data(forKey: "weatherPlace").flatMap { try? JSONDecoder().decode(WeatherPlace.self, from: $0) }

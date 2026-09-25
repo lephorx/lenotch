@@ -26,6 +26,9 @@ final class NowPlayingService {
     private var timestamp = Date()
     private var playbackRate: Double = 1
 
+    /// Called when a different song starts (not when playback first appears).
+    @ObservationIgnored var onTrackChange: (() -> Void)?
+
     @ObservationIgnored private var provider: PlaybackProvider?
     @ObservationIgnored private var isRunning = false
     @ObservationIgnored private var appIconBundleID: String?
@@ -167,9 +170,14 @@ final class NowPlayingService {
         }
 
         let trackChanged = track != snapshot.track
+        let previous = track
         if trackChanged { track = snapshot.track }
         if artwork !== snapshot.artwork { artwork = snapshot.artwork }
         updateAppInfo(bundleID: snapshot.track.bundleIdentifier)
+        // A new song, not the first one seen or the same song with a filled-in duration.
+        if let previous, previous.title != snapshot.track.title || previous.artist != snapshot.track.artist {
+            onTrackChange?()
+        }
 
         let now = Date()
         if let holdUntil = extrasHoldUntil, now < holdUntil, !trackChanged {

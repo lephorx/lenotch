@@ -13,9 +13,15 @@ struct ExpandedView: View {
             header
                 .frame(height: model.geometry.notchSize.height)
             // The new tab's items slide in one by one (`slideIn`); the old tab just fades.
-            pageContent
+            Group {
+                if model.isTimerPanelVisible {
+                    TimerPanel(model: model)
+                } else {
+                    pageContent
+                }
+            }
                 .environment(\.pageMovesForward, model.pageMovesForward)
-                .id(model.visiblePage)
+                .id(model.isTimerPanelVisible ? "timer" : "page\(model.visiblePage.rawValue)")
                 .transition(.asymmetric(insertion: .identity,
                                         removal: .opacity.animation(.easeOut(duration: 0.12))))
                 .padding(.horizontal, 30)
@@ -80,6 +86,13 @@ struct ExpandedView: View {
                 if model.settings.showMirror, model.isCameraAllowed {
                     HeaderButton(symbol: "camera.fill", label: "Mirror", isOn: model.isMirrorVisible,
                                  action: model.toggleMirror)
+                }
+                // Hidden unless turned on in Settings, but a running timer stays reachable.
+                if settings.showTimer || model.timer.isActive {
+                    HeaderButton(symbol: "timer", label: "Timer",
+                                 isOn: model.isTimerPanelVisible || model.timer.isActive) {
+                        withAnimation(NotchViewModel.pageSpring) { model.isTimerPanelVisible.toggle() }
+                    }
                 }
                 HeaderButton(symbol: "gearshape.fill", label: "Settings", action: model.openSettings)
                 if model.battery.hasBattery {

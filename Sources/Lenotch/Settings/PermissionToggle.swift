@@ -49,5 +49,10 @@ extension PermissionCenter {
                          openSettings: { self.openPrivacySettings("Privacy_Camera") })
     }
 
+    func accessibilityToggle(_ title: String, isEnabled: Binding<Bool>) -> PermissionToggle {
+        PermissionToggle(title: title, isEnabled: isEnabled, status: accessibility, request: requestAccessibility,
+                         openSettings: { self.openPrivacySettings("Privacy_Accessibility") })
+    }
+
     enum CalendarKind { case events, reminders }
 }
