@@ -89,6 +89,10 @@ final class PrivacyMonitor {
             var bundleSize = UInt32(MemoryLayout<Unmanaged<CFString>?>.size)
             let id = AudioObjectGetPropertyData(process, &bundleAddress, 0, nil, &bundleSize, &bundleID) == noErr
                 ? bundleID?.takeRetainedValue() as String? : nil
+            // Apple's background services (e.g. CoreSpeech listening for "Hey Siri" whenever
+            // a sound plays) don't get macOS's orange dot either; Apple apps like FaceTime do.
+            if let id, id.hasPrefix("com.apple."),
+               NSWorkspace.shared.urlForApplication(withBundleIdentifier: id) == nil { continue }
             apps.append(id ?? "")
         }
         return apps
