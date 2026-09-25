@@ -70,7 +70,7 @@ enum SettingsSection: String, CaseIterable, Identifiable {
     var keywords: [String] {
         switch self {
         case .general: ["open", "hover", "click", "delay", "shortcut", "keyboard", "menu bar", "icon", "login",
-                        "startup", "update", "welcome", "intro", "peek", "volume", "brightness", "indicator", "hud", "accessibility", "microphone", "mic", "privacy", "recording"]
+                        "startup", "update", "welcome", "intro", "peek", "what's new", "release notes", "changelog", "volume", "brightness", "indicator", "hud", "accessibility", "microphone", "mic", "privacy", "recording"]
         case .look: ["style", "black", "glass", "liquid", "opacity", "transparent", "colour", "color", "gradient",
                      "fade", "battery", "percentage", "look", "appearance", "theme"]
         case .music: ["music", "song", "player", "spotify", "apple music", "youtube", "source", "shuffle", "repeat",
@@ -98,6 +98,7 @@ struct SettingsView: View {
     let permissions: PermissionCenter
     let updater: SPUUpdater
     let showOnboarding: () -> Void
+    let showWhatsNew: () -> Void
     let playIntro: () -> Void
 
     /// Page shown when the window opens (debug hooks can pick another).
@@ -154,7 +155,7 @@ struct SettingsView: View {
     private var detail: some View {
         switch section ?? .general {
         case .general:
-            GeneralSettings(settings: settings, permissions: permissions, updater: updater, showOnboarding: showOnboarding, playIntro: playIntro)
+            GeneralSettings(settings: settings, permissions: permissions, updater: updater, showOnboarding: showOnboarding, showWhatsNew: showWhatsNew, playIntro: playIntro)
         case .look:
             LookSettings(settings: settings)
         case .music:
@@ -197,6 +198,7 @@ private struct GeneralSettings: View {
     let permissions: PermissionCenter
     let updater: SPUUpdater
     let showOnboarding: () -> Void
+    let showWhatsNew: () -> Void
     let playIntro: () -> Void
 
     @State private var launchAtLogin = SMAppService.mainApp.status == .enabled
@@ -261,6 +263,9 @@ private struct GeneralSettings: View {
                 ))
             }
             Section("Help") {
+                LabeledContent("What's new in this version") {
+                    Button("Show…", action: showWhatsNew)
+                }
                 LabeledContent("Welcome screen") {
                     Button("Show Again…", action: showOnboarding)
                 }

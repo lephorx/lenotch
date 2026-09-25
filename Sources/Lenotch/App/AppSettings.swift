@@ -58,6 +58,8 @@ final class AppSettings {
     // MARK: Setup
     var hasCompletedOnboarding: Bool { didSet { save(hasCompletedOnboarding, "hasCompletedOnboarding") } }
     var hasPlayedIntro: Bool { didSet { save(hasPlayedIntro, "hasPlayedIntro") } }
+    /// The version whose What's New was last shown (or that was first installed).
+    var lastSeenVersion: String? { didSet { defaults.set(lastSeenVersion, forKey: "lastSeenVersion") } }
 
     // MARK: General
     var openMode: OpenMode { didSet { save(openMode.rawValue, "openMode") } }
@@ -182,6 +184,7 @@ final class AppSettings {
 
         hasCompletedOnboarding = bool("hasCompletedOnboarding", false)
         hasPlayedIntro = bool("hasPlayedIntro", false)
+        lastSeenVersion = defaults.string(forKey: "lastSeenVersion")
         openMode = defaults.string(forKey: "openMode").flatMap(OpenMode.init) ?? .hover
         func shortcut(_ key: String, _ fallback: KeyShortcut) -> KeyShortcut? {
             guard let data = defaults.data(forKey: key) else { return fallback }
