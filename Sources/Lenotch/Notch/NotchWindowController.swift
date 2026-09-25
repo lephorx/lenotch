@@ -27,6 +27,7 @@ final class NotchWindowController {
     private var peekEnd: DispatchWorkItem?
     private let indicators = SystemIndicators()
     private let mediaKeys = MediaKeyTap()
+    private let privacyMonitor = PrivacyMonitor()
     /// Waits for Accessibility to be allowed in System Settings, then starts the key tap.
     private var accessibilityWait: Timer?
     private var indicatorEnd: DispatchWorkItem?
@@ -72,6 +73,7 @@ final class NotchWindowController {
         indicators.onChange = { [weak self] indicator in
             DispatchQueue.main.async { self?.showIndicator(indicator) }
         }
+        privacyMonitor.onChange = { [weak self] activity in self?.model.privacy = activity }
         mediaKeys.onKey = { [weak self] key, fine in self?.handleMediaKey(key, fine: fine) ?? false }
         followIndicatorSettings()
         installMouseMonitors()
@@ -279,6 +281,7 @@ final class NotchWindowController {
             mediaKeys.handlesVolume = settings.hideSystemIndicator && settings.showVolumeIndicator
             mediaKeys.handlesBrightness = settings.hideSystemIndicator && settings.showBrightnessIndicator
             updateMediaKeyTap()
+            privacyMonitor.isEnabled = settings.showPrivacyIndicator
         } onChange: { [weak self] in
             DispatchQueue.main.async { self?.followIndicatorSettings() }
         }
@@ -468,6 +471,12 @@ final class NotchWindowController {
                         while let current = view { chain.append(String(describing: type(of: current))); view = current.superview }
                         NSLog("Lenotch debug: hit (\(x), \(y)) -> \(chain.joined(separator: " < "))")
                     }
+                case "privacy" where parts.count >= 2:
+                    // Fakes mic/camera use: privacy mic|cam|both|off [bundleID]
+                    let kind = parts[1]
+                    self.model.privacy = PrivacyActivity(micApps: parts.count > 2 ? [parts[2]] : [],
+                                                         isMicOn: kind == "mic" || kind == "both",
+                                                         isCameraOn: kind == "cam" || kind == "both")
                 case "mediakey" where parts.count == 2:
                     // Runs a taken-over key: volup, voldown, mute, brightup, brightdown.
                     let keys: [String: MediaKeyTap.Key] = ["volup": .volumeUp, "voldown": .volumeDown, "mute": .mute,

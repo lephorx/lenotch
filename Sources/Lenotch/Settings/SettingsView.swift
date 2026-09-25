@@ -70,7 +70,7 @@ enum SettingsSection: String, CaseIterable, Identifiable {
     var keywords: [String] {
         switch self {
         case .general: ["open", "hover", "click", "delay", "shortcut", "keyboard", "menu bar", "icon", "login",
-                        "startup", "update", "welcome", "intro", "peek", "volume", "brightness", "indicator", "hud", "accessibility"]
+                        "startup", "update", "welcome", "intro", "peek", "volume", "brightness", "indicator", "hud", "accessibility", "microphone", "mic", "privacy", "recording"]
         case .look: ["style", "black", "glass", "liquid", "opacity", "transparent", "colour", "color", "gradient",
                      "fade", "battery", "percentage", "look", "appearance", "theme"]
         case .music: ["music", "song", "player", "spotify", "apple music", "youtube", "source", "shuffle", "repeat",
@@ -240,6 +240,11 @@ private struct GeneralSettings: View {
                 Text("Show changes in the notch")
             } footer: {
                 Text("The level appears beside the notch for a moment. Hiding macOS's own indicator needs Accessibility, so Lenotch can handle the volume and brightness keys itself.")
+            }
+            Section {
+                Toggle("Microphone and camera in use", isOn: $settings.showPrivacyIndicator)
+            } footer: {
+                Text("Shows the app's icon with an orange (microphone) or green (camera) dot beside the notch. No permission needed.")
             }
             Section {
                 Toggle("Show icon in the menu bar", isOn: $settings.showMenuBarIcon)

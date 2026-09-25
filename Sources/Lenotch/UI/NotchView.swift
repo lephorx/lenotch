@@ -36,6 +36,7 @@ struct NotchView: View {
             .animation(.spring(response: 0.45, dampingFraction: 0.8), value: model.isPeeking)
             .animation(.spring(response: 0.42, dampingFraction: 0.82), value: model.showsLiveActivity)
             .animation(.spring(response: 0.38, dampingFraction: 0.82), value: model.indicator != nil)
+            .animation(.spring(response: 0.42, dampingFraction: 0.82), value: model.showsPrivacy)
             .animation(.easeInOut(duration: 0.3), value: model.settings.appearance)
             .animation(.easeInOut(duration: 0.25), value: model.backgroundGradient)
             .animation(.easeInOut(duration: 0.6), value: model.accentColor)
@@ -62,6 +63,9 @@ struct NotchView: View {
         } else if model.isPeeking, let track = model.media.track {
             PeekView(model: model, track: track)
                 .transition(.opacity.combined(with: .scale(0.95, anchor: .top)))
+        } else if model.showsPrivacy {
+            PrivacyView(model: model)
+                .transition(.opacity)
         } else if model.showsLiveActivity {
             LiveActivityView(model: model)
                 .transition(.opacity)

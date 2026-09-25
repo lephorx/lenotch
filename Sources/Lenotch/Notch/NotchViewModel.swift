@@ -40,6 +40,12 @@ final class NotchViewModel {
     var isPeeking = false
     /// A volume or brightness change showing beside the closed notch.
     var indicator: SystemIndicator?
+    /// Apps using the microphone or camera right now.
+    var privacy = PrivacyActivity()
+    /// The closed notch shows the mic/camera dots (Lenotch's own camera mirror doesn't count).
+    var showsPrivacy: Bool {
+        settings.showPrivacyIndicator && (privacy.isMicOn || (privacy.isCameraOn && !isMirrorVisible))
+    }
     var selectedPage: NotchPage = .player
     var geometry: NotchGeometry
     /// Set while the user drags the progress bar so the notch does not close mid-scrub.
@@ -206,7 +212,7 @@ final class NotchViewModel {
         if isPeeking, state == .closed { return geometry.peekSize }
         return switch state {
         case .open: openSize(for: visiblePage)
-        case .closed: showsLiveActivity ? geometry.liveSize : geometry.closedSize
+        case .closed: showsLiveActivity || showsPrivacy ? geometry.liveSize : geometry.closedSize
         }
     }
 }
