@@ -32,12 +32,19 @@ struct NotchView: View {
             // Microphone (orange) or camera (green) in use: a thin outline around the notch.
             // Stroked on the edge and clipped, so the line sits just inside it.
             .overlay {
-                if let color = privacyColor {
-                    PrivacyOutline(shape: shape, color: color)
+                if let colors = privacyColors {
+                    PrivacyOutline(shape: shape, colors: colors, glow: false)
                         .transition(.opacity)
                 }
             }
             .clipShape(shape)
+            // The optional glow spreads outside the notch, so it's drawn after the clip.
+            .background {
+                if let colors = privacyColors, model.settings.privacyGlow {
+                    PrivacyOutline(shape: shape, colors: colors, glow: true)
+                        .transition(.opacity)
+                }
+            }
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
             .animation(.spring(response: 0.42, dampingFraction: 0.82), value: model.state)
             .animation(.spring(response: 0.5, dampingFraction: 0.78), value: model.isShowingIntro)
@@ -61,9 +68,11 @@ struct NotchView: View {
             .environment(\.colorScheme, .dark)
     }
 
-    private var privacyColor: Color? {
+    /// Orange for the microphone, green for the camera, both (left to right) for a video call.
+    private var privacyColors: [Color]? {
         guard model.showsPrivacy else { return nil }
-        return model.privacy.isMicOn ? .orange : .green
+        let colors = (model.privacy.isMicOn ? [Color.orange] : []) + (model.privacy.isCameraOn ? [Color.green] : [])
+        return colors.isEmpty ? nil : colors
     }
 
     @ViewBuilder
@@ -107,16 +116,37 @@ struct NotchView: View {
     }
 }
 
-/// The outline shown while the microphone or camera is in use, gently pulsing.
+/// The outline shown while the microphone or camera is in use, gently pulsing. It fades
+/// out towards the top so no colour shows along the top edge of the screen. With `glow`
+/// it's a soft blurred halo around the notch instead.
 private struct PrivacyOutline: View {
     let shape: NotchShape
-    let color: Color
+    let colors: [Color]
+    let glow: Bool
     @State private var bright = false
 
     var body: some View {
-        shape.stroke(color, lineWidth: 3)
-            .shadow(color: color.opacity(0.8), radius: 3)
-            .opacity(bright ? 1 : 0.6)
+        shape.stroke(LinearGradient(colors: colors, startPoint: .leading, endPoint: .trailing),
+                     lineWidth: glow ? 5 : 3)
+            .blur(radius: glow ? 7 : 0)
+            .opacity(bright ? 1 : glow ? 0.45 : 0.6)
+            .mask {
+                GeometryReader { proxy in
+                    ZStack {
+                        LinearGradient(stops: [.init(color: .clear, location: 0),
+                                               .init(color: .black, location: min(14 / max(proxy.size.height, 1), 1))],
+                                       startPoint: .top, endPoint: .bottom)
+                            // The glow's blur reaches past the frame; let it show below and beside.
+                            .padding(glow ? -24 : 0)
+                            .padding(.top, glow ? 24 : 0)
+                        if glow {
+                            // Only outside the notch: a see-through glass notch mustn't show it inside.
+                            shape.fill(.black).blendMode(.destinationOut)
+                        }
+                    }
+                    .compositingGroup()
+                }
+            }
             .allowsHitTesting(false)
             .onAppear {
                 withAnimation(.easeInOut(duration: 1.4).repeatForever(autoreverses: true)) { bright = true }

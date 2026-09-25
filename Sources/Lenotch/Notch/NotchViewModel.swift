@@ -54,10 +54,8 @@ final class NotchViewModel {
     var showsCrypto: Bool { settings.showCrypto && !crypto.prices.isEmpty }
     /// Apps using the microphone or camera right now.
     var privacy = PrivacyActivity()
-    /// The notch gets an orange/green outline (Lenotch's own camera mirror doesn't count).
-    var showsPrivacy: Bool {
-        settings.showPrivacyIndicator && (privacy.isMicOn || (privacy.isCameraOn && !isMirrorVisible))
-    }
+    /// The notch gets an orange (mic) and/or green (camera) outline.
+    var showsPrivacy: Bool { settings.showPrivacyIndicator && !privacy.isEmpty }
     var selectedPage: NotchPage = .player
     var geometry: NotchGeometry
     /// Set while the user drags the progress bar so the notch does not close mid-scrub.

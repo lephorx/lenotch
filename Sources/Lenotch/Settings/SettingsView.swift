@@ -260,9 +260,11 @@ private struct GeneralSettings: View {
             }
             Section {
                 Toggle("Microphone and camera in use", isOn: $settings.showPrivacyIndicator)
+                Toggle("Glow", isOn: $settings.privacyGlow)
+                    .disabled(!settings.showPrivacyIndicator)
                 Toggle("Network speed during downloads", isOn: $settings.showNetworkSpeed)
             } footer: {
-                Text("An orange outline around the notch while an app uses the microphone (green for the camera). Download and upload speed shows beside the notch while a big transfer runs and no music plays. No permission needed.")
+                Text("An orange outline around the notch while an app uses the microphone (green for the camera, both during a video call), with an optional glow. Download and upload speed shows beside the notch while a big transfer runs and no music plays. No permission needed.")
             }
             Section {
                 Toggle("Show icon in the menu bar", isOn: $settings.showMenuBarIcon)

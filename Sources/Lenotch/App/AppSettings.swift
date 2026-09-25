@@ -104,6 +104,8 @@ final class AppSettings {
     var cryptoCurrency: String { didSet { save(cryptoCurrency, "cryptoCurrency") } }
     /// Show which app uses the microphone or camera beside the closed notch.
     var showPrivacyIndicator: Bool { didSet { save(showPrivacyIndicator, "showPrivacyIndicator") } }
+    /// The mic/camera outline also glows outside the notch.
+    var privacyGlow: Bool { didSet { save(privacyGlow, "privacyGlow") } }
     var hideSystemIndicator: Bool { didSet { save(hideSystemIndicator, "hideSystemIndicator") } }
     var expandedCalendarStyle: ExpandedCalendarStyle {
         didSet { save(expandedCalendarStyle.rawValue, "expandedCalendarStyle") }
@@ -215,6 +217,7 @@ final class AppSettings {
         showBrightnessIndicator = bool("showBrightnessIndicator", true)
         hideSystemIndicator = bool("hideSystemIndicator", true)
         showPrivacyIndicator = bool("showPrivacyIndicator", true)
+        privacyGlow = bool("privacyGlow", false)
         showCrypto = bool("showCrypto", false)
         showNetworkSpeed = bool("showNetworkSpeed", true)
         showTimer = bool("showTimer", false)

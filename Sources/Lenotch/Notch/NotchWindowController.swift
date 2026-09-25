@@ -572,7 +572,7 @@ final class NotchWindowController {
                 }
             }
             let page = self.model.visiblePage.rawValue
-            let status = "state=\(self.model.state) intro=\(self.model.isShowingIntro) page=\(page)/\(self.model.pages.count) mirror=\(self.model.isMirrorVisible) camera=\(self.model.camera.status) keytap=\(self.mediaKeys.isRunning) network=\(String(describing: self.model.network))\n"
+            let status = "state=\(self.model.state) intro=\(self.model.isShowingIntro) page=\(page)/\(self.model.pages.count) mirror=\(self.model.isMirrorVisible) camera=\(self.model.camera.status) keytap=\(self.mediaKeys.isRunning) network=\(String(describing: self.model.network)) privacy=\(self.model.privacy)\n"
             try? status.write(toFile: output, atomically: true, encoding: .utf8)
         }
     }
