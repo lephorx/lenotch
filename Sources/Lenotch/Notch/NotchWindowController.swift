@@ -25,6 +25,9 @@ final class NotchWindowController {
     /// elsewhere, or the pointer entering and then leaving the notch.
     private var openedByKeyboard = false
     private var peekEnd: DispatchWorkItem?
+    private let indicators = SystemIndicators()
+    private var indicatorEnd: DispatchWorkItem?
+    private static let indicatorDuration = 1.6
     /// Horizontal finger travel (points) that counts as a tab swipe.
     private static let swipeThreshold: CGFloat = 60
 
@@ -63,6 +66,10 @@ final class NotchWindowController {
             DispatchQueue.main.async { self?.peekForTrackChange() }
         }
 
+        indicators.onChange = { [weak self] indicator in
+            DispatchQueue.main.async { self?.showIndicator(indicator) }
+        }
+        followIndicatorSettings()
         installMouseMonitors()
         #if DEBUG
         installDebugHooks()
@@ -259,6 +266,27 @@ final class NotchWindowController {
         DispatchQueue.main.asyncAfter(deadline: .now() + Self.peekDuration, execute: end)
     }
 
+    /// Starts or stops watching volume and brightness as their switches change.
+    private func followIndicatorSettings() {
+        let settings = model.settings
+        withObservationTracking {
+            indicators.watchesVolume = settings.showVolumeIndicator
+            indicators.watchesBrightness = settings.showBrightnessIndicator
+        } onChange: { [weak self] in
+            DispatchQueue.main.async { self?.followIndicatorSettings() }
+        }
+    }
+
+    /// Volume or brightness beside the closed notch; hides shortly after the last change.
+    private func showIndicator(_ indicator: SystemIndicator) {
+        guard model.state == .closed, !model.isShowingIntro, !model.isShowingAppearancePreview else { return }
+        model.indicator = indicator
+        indicatorEnd?.cancel()
+        let end = DispatchWorkItem { [weak self] in self?.model.indicator = nil }
+        indicatorEnd = end
+        DispatchQueue.main.asyncAfter(deadline: .now() + Self.indicatorDuration, execute: end)
+    }
+
     /// Shows the new song in the closed notch, if turned on. Unlike the shortcut it
     /// never closes an open notch, and a showing peek just stays up longer.
     private func peekForTrackChange() {
@@ -342,6 +370,8 @@ final class NotchWindowController {
         if state == .open {
             peekEnd?.cancel()
             model.isPeeking = false
+            indicatorEnd?.cancel()
+            model.indicator = nil
         } else {
             openedByKeyboard = false
             model.setUsageHover(nil)

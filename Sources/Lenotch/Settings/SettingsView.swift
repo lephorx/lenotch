@@ -231,6 +231,14 @@ private struct GeneralSettings: View {
                 Text("Work in any app. Swipe up on the open notch to close it.")
             }
             Section {
+                Toggle("Volume", isOn: $settings.showVolumeIndicator)
+                Toggle("Brightness", isOn: $settings.showBrightnessIndicator)
+            } header: {
+                Text("Show changes in the notch")
+            } footer: {
+                Text("The level appears beside the notch for a moment. The macOS indicator still shows as well.")
+            }
+            Section {
                 Toggle("Show icon in the menu bar", isOn: $settings.showMenuBarIcon)
             } header: {
                 Text("Menu bar")

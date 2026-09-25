@@ -38,6 +38,8 @@ final class NotchViewModel {
     var isShowingAppearancePreview = false
     /// Briefly showing the current song under the closed notch.
     var isPeeking = false
+    /// A volume or brightness change showing beside the closed notch.
+    var indicator: SystemIndicator?
     var selectedPage: NotchPage = .player
     var geometry: NotchGeometry
     /// Set while the user drags the progress bar so the notch does not close mid-scrub.
@@ -200,6 +202,7 @@ final class NotchViewModel {
 
     var currentSize: CGSize {
         if isShowingIntro || isShowingAppearancePreview { return geometry.introSize }
+        if indicator != nil, state == .closed { return geometry.indicatorSize }
         if isPeeking, state == .closed { return geometry.peekSize }
         return switch state {
         case .open: openSize(for: visiblePage)

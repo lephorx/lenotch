@@ -34,6 +34,12 @@ struct NotchGeometry: Equatable {
         CGSize(width: notchSize.width + 2 * (notchSize.height + 12), height: notchSize.height)
     }
 
+    /// Volume or brightness level on both sides of the closed notch.
+    static let indicatorSideWidth: CGFloat = 110
+    var indicatorSize: CGSize {
+        CGSize(width: notchSize.width + 2 * Self.indicatorSideWidth, height: notchSize.height)
+    }
+
     /// The card that drops out of the closed notch to show the current song.
     var peekSize: CGSize {
         CGSize(width: notchSize.width + 240, height: notchSize.height + 58)
