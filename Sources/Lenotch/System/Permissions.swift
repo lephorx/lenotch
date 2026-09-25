@@ -22,6 +22,8 @@ final class PermissionCenter {
     private(set) var calendar: Status = .notAsked
     private(set) var reminders: Status = .notAsked
     private(set) var camera: Status = .notAsked
+    /// macOS can't tell "not asked" from "denied" here; both show as `.notAsked`.
+    private(set) var accessibility: Status = .notAsked
     private(set) var automation: [String: Status] = [:]
 
     @ObservationIgnored private let settings: AppSettings
@@ -58,6 +60,7 @@ final class PermissionCenter {
         case .notDetermined: .notAsked
         default: .denied
         }
+        accessibility = AXIsProcessTrusted() ? .granted : .notAsked
         for app in controllableApps {
             automation[app.id] = Self.automationStatus(app.id, ask: false)
         }
@@ -77,6 +80,13 @@ final class PermissionCenter {
         EKEventStore().requestFullAccessToReminders { _, _ in
             DispatchQueue.main.async { self.finished() }
         }
+    }
+
+    /// Shows macOS's Accessibility prompt, which leads to System Settings. The status
+    /// updates when the user comes back to Lenotch.
+    func requestAccessibility() {
+        let options = [kAXTrustedCheckOptionPrompt.takeUnretainedValue() as String: true] as CFDictionary
+        if !AXIsProcessTrustedWithOptions(options) { openPrivacySettings("Privacy_Accessibility") }
     }
 
     func requestCamera() {

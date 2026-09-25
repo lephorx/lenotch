@@ -103,6 +103,38 @@ final class SystemIndicators {
         return (level, muted != 0)
     }
 
+    /// Sets the output volume (0...1) and shows it, even when already at the limit.
+    /// Returns false when the device has no settable volume.
+    func adjustVolume(by step: Double) -> Bool {
+        if device == kAudioObjectUnknown { attachToDefaultDevice() }
+        guard let current = readVolume() else { return false }
+        var level = Float32(min(max(Double(current.level) + step, 0), 1))
+        var address = Self.volumeAddress
+        guard AudioObjectSetPropertyData(device, &address, 0, nil, UInt32(MemoryLayout<Float32>.size), &level) == noErr
+        else { return false }
+        // Turning it up unmutes, like macOS does.
+        if step > 0, current.muted { setMuted(false) }
+        let muted = step > 0 ? false : current.muted
+        lastVolume = (level, muted)
+        onChange?(SystemIndicator(kind: .volume, level: Double(level), muted: muted))
+        return true
+    }
+
+    func toggleMute() -> Bool {
+        if device == kAudioObjectUnknown { attachToDefaultDevice() }
+        guard let current = readVolume(), setMuted(!current.muted) else { return false }
+        lastVolume = (current.level, !current.muted)
+        onChange?(SystemIndicator(kind: .volume, level: Double(current.level), muted: !current.muted))
+        return true
+    }
+
+    @discardableResult
+    private func setMuted(_ muted: Bool) -> Bool {
+        var value: UInt32 = muted ? 1 : 0
+        var address = Self.muteAddress
+        return AudioObjectSetPropertyData(device, &address, 0, nil, UInt32(MemoryLayout<UInt32>.size), &value) == noErr
+    }
+
     private func volumeDidChange() {
         guard let now = readVolume() else { return }
         defer { lastVolume = now }
@@ -118,6 +150,23 @@ final class SystemIndicators {
               let symbol = dlsym(handle, "DisplayServicesGetBrightness") else { return nil }
         return unsafeBitCast(symbol, to: GetBrightness.self)
     }()
+
+    private typealias SetBrightness = @convention(c) (CGDirectDisplayID, Float) -> Int32
+    private static let setBrightness: SetBrightness? = {
+        guard let handle = dlopen("/System/Library/PrivateFrameworks/DisplayServices.framework/DisplayServices", RTLD_LAZY),
+              let symbol = dlsym(handle, "DisplayServicesSetBrightness") else { return nil }
+        return unsafeBitCast(symbol, to: SetBrightness.self)
+    }()
+
+    /// Sets the built-in display's brightness and shows it. Returns false when it can't.
+    func adjustBrightness(by step: Double) -> Bool {
+        guard let set = Self.setBrightness, let current = readBrightness() else { return false }
+        let level = Float(min(max(Double(current) + step, 0), 1))
+        guard set(display, level) == 0 else { return false }
+        lastBrightness = level
+        onChange?(SystemIndicator(kind: .brightness, level: Double(level)))
+        return true
+    }
 
     private var brightnessTimer: Timer?
     private var lastBrightness: Float?

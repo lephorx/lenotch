@@ -70,7 +70,7 @@ enum SettingsSection: String, CaseIterable, Identifiable {
     var keywords: [String] {
         switch self {
         case .general: ["open", "hover", "click", "delay", "shortcut", "keyboard", "menu bar", "icon", "login",
-                        "startup", "update", "welcome", "intro", "peek", "volume", "brightness", "indicator", "hud"]
+                        "startup", "update", "welcome", "intro", "peek", "volume", "brightness", "indicator", "hud", "accessibility"]
         case .look: ["style", "black", "glass", "liquid", "opacity", "transparent", "colour", "color", "gradient",
                      "fade", "battery", "percentage", "look", "appearance", "theme"]
         case .music: ["music", "song", "player", "spotify", "apple music", "youtube", "source", "shuffle", "repeat",
@@ -154,7 +154,7 @@ struct SettingsView: View {
     private var detail: some View {
         switch section ?? .general {
         case .general:
-            GeneralSettings(settings: settings, updater: updater, showOnboarding: showOnboarding, playIntro: playIntro)
+            GeneralSettings(settings: settings, permissions: permissions, updater: updater, showOnboarding: showOnboarding, playIntro: playIntro)
         case .look:
             LookSettings(settings: settings)
         case .music:
@@ -194,6 +194,7 @@ struct SettingsView: View {
 /// How the notch opens, shortcuts, the menu bar icon, startup and help.
 private struct GeneralSettings: View {
     @Bindable var settings: AppSettings
+    let permissions: PermissionCenter
     let updater: SPUUpdater
     let showOnboarding: () -> Void
     let playIntro: () -> Void
@@ -233,10 +234,12 @@ private struct GeneralSettings: View {
             Section {
                 Toggle("Volume", isOn: $settings.showVolumeIndicator)
                 Toggle("Brightness", isOn: $settings.showBrightnessIndicator)
+                permissions.accessibilityToggle("Hide the macOS indicator", isEnabled: $settings.hideSystemIndicator)
+                    .disabled(!settings.showVolumeIndicator && !settings.showBrightnessIndicator)
             } header: {
                 Text("Show changes in the notch")
             } footer: {
-                Text("The level appears beside the notch for a moment. The macOS indicator still shows as well.")
+                Text("The level appears beside the notch for a moment. Hiding macOS's own indicator needs Accessibility, so Lenotch can handle the volume and brightness keys itself.")
             }
             Section {
                 Toggle("Show icon in the menu bar", isOn: $settings.showMenuBarIcon)

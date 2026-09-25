@@ -26,6 +26,9 @@ final class NotchWindowController {
     private var openedByKeyboard = false
     private var peekEnd: DispatchWorkItem?
     private let indicators = SystemIndicators()
+    private let mediaKeys = MediaKeyTap()
+    /// Waits for Accessibility to be allowed in System Settings, then starts the key tap.
+    private var accessibilityWait: Timer?
     private var indicatorEnd: DispatchWorkItem?
     private static let indicatorDuration = 1.6
     /// Horizontal finger travel (points) that counts as a tab swipe.
@@ -69,6 +72,7 @@ final class NotchWindowController {
         indicators.onChange = { [weak self] indicator in
             DispatchQueue.main.async { self?.showIndicator(indicator) }
         }
+        mediaKeys.onKey = { [weak self] key, fine in self?.handleMediaKey(key, fine: fine) ?? false }
         followIndicatorSettings()
         installMouseMonitors()
         #if DEBUG
@@ -272,8 +276,40 @@ final class NotchWindowController {
         withObservationTracking {
             indicators.watchesVolume = settings.showVolumeIndicator
             indicators.watchesBrightness = settings.showBrightnessIndicator
+            mediaKeys.handlesVolume = settings.hideSystemIndicator && settings.showVolumeIndicator
+            mediaKeys.handlesBrightness = settings.hideSystemIndicator && settings.showBrightnessIndicator
+            updateMediaKeyTap()
         } onChange: { [weak self] in
             DispatchQueue.main.async { self?.followIndicatorSettings() }
+        }
+    }
+
+    private func updateMediaKeyTap() {
+        let wanted = mediaKeys.handlesVolume || mediaKeys.handlesBrightness
+        guard wanted else {
+            mediaKeys.stop()
+            accessibilityWait?.invalidate()
+            accessibilityWait = nil
+            return
+        }
+        guard !mediaKeys.start(), accessibilityWait == nil else { return }
+        accessibilityWait = Timer.scheduledTimer(withTimeInterval: 2, repeats: true) { [weak self] timer in
+            guard let self, self.mediaKeys.start() else { return }
+            timer.invalidate()
+            self.accessibilityWait = nil
+        }
+    }
+
+    /// A volume or brightness key taken over from macOS. Steps match macOS: 16 per
+    /// full range, or 64 with Option+Shift.
+    private func handleMediaKey(_ key: MediaKeyTap.Key, fine: Bool) -> Bool {
+        let step = fine ? 1.0 / 64 : 1.0 / 16
+        return switch key {
+        case .volumeUp: indicators.adjustVolume(by: step)
+        case .volumeDown: indicators.adjustVolume(by: -step)
+        case .mute: indicators.toggleMute()
+        case .brightnessUp: indicators.adjustBrightness(by: step)
+        case .brightnessDown: indicators.adjustBrightness(by: -step)
         }
     }
 
@@ -432,6 +468,11 @@ final class NotchWindowController {
                         while let current = view { chain.append(String(describing: type(of: current))); view = current.superview }
                         NSLog("Lenotch debug: hit (\(x), \(y)) -> \(chain.joined(separator: " < "))")
                     }
+                case "mediakey" where parts.count == 2:
+                    // Runs a taken-over key: volup, voldown, mute, brightup, brightdown.
+                    let keys: [String: MediaKeyTap.Key] = ["volup": .volumeUp, "voldown": .volumeDown, "mute": .mute,
+                                                           "brightup": .brightnessUp, "brightdown": .brightnessDown]
+                    if let key = keys[parts[1]] { NSLog("Lenotch debug: mediakey \(parts[1]) -> \(self.handleMediaKey(key, fine: false))") }
                 case "page" where parts.count == 2:
                     if let index = Int(parts[1]), self.model.pages.indices.contains(index) {
                         self.model.selectedPage = self.model.pages[index]
@@ -468,7 +509,7 @@ final class NotchWindowController {
                 }
             }
             let page = self.model.visiblePage.rawValue
-            let status = "state=\(self.model.state) intro=\(self.model.isShowingIntro) page=\(page)/\(self.model.pages.count) mirror=\(self.model.isMirrorVisible) camera=\(self.model.camera.status)\n"
+            let status = "state=\(self.model.state) intro=\(self.model.isShowingIntro) page=\(page)/\(self.model.pages.count) mirror=\(self.model.isMirrorVisible) camera=\(self.model.camera.status) keytap=\(self.mediaKeys.isRunning)\n"
             try? status.write(toFile: output, atomically: true, encoding: .utf8)
         }
     }

@@ -29,6 +29,11 @@ struct PermissionsView: View {
                 grantedText: "On",
                 allow: permissions.enableAudioVisualizer,
                 pane: "Privacy_AudioCapture")
+            row(symbol: "accessibility", title: "Accessibility",
+                detail: "Volume and brightness keys show only Lenotch's indicator.",
+                status: permissions.accessibility,
+                allow: permissions.requestAccessibility,
+                pane: "Privacy_Accessibility")
             ForEach(permissions.controllableApps) { app in
                 row(symbol: "play.circle.fill", title: "Control \(app.name)",
                     detail: "Read and control \(app.name) directly.",

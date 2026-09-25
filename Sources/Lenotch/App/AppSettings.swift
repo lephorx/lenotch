@@ -85,6 +85,9 @@ final class AppSettings {
     var showVolumeIndicator: Bool { didSet { save(showVolumeIndicator, "showVolumeIndicator") } }
     /// Show brightness changes beside the notch.
     var showBrightnessIndicator: Bool { didSet { save(showBrightnessIndicator, "showBrightnessIndicator") } }
+    /// Take over the volume/brightness keys so macOS's own indicator doesn't show
+    /// (only works once Accessibility is allowed).
+    var hideSystemIndicator: Bool { didSet { save(hideSystemIndicator, "hideSystemIndicator") } }
     var expandedCalendarStyle: ExpandedCalendarStyle {
         didSet { save(expandedCalendarStyle.rawValue, "expandedCalendarStyle") }
     }
@@ -191,6 +194,7 @@ final class AppSettings {
         peekOnTrackChange = bool("peekOnTrackChange", true)
         showVolumeIndicator = bool("showVolumeIndicator", true)
         showBrightnessIndicator = bool("showBrightnessIndicator", true)
+        hideSystemIndicator = bool("hideSystemIndicator", true)
         expandedCalendarStyle = defaults.string(forKey: "expandedCalendarStyle")
             .flatMap(ExpandedCalendarStyle.init) ?? .month
         weatherPlace = defaults.data(forKey: "weatherPlace").flatMap { try? JSONDecoder().decode(WeatherPlace.self, from: $0) }
