@@ -27,28 +27,23 @@ struct NotchGeometry: Equatable {
         }
     }
 
-    /// The closed notch reaches a little below the hardware notch, so its edges and
-    /// corners sit over the real one instead of just along it.
-    static let closedExtraHeight: CGFloat = 3
-    var closedHeight: CGFloat { notchSize.height + Self.closedExtraHeight }
-
-    var closedSize: CGSize { CGSize(width: notchSize.width, height: closedHeight) }
+    var closedSize: CGSize { notchSize }
 
     /// Collapsed notch with artwork on the left and bars on the right.
     var liveSize: CGSize {
-        CGSize(width: notchSize.width + 2 * (notchSize.height + 12), height: closedHeight)
+        CGSize(width: notchSize.width + 2 * (notchSize.height + 12), height: notchSize.height)
     }
 
     /// Volume or brightness level on both sides of the closed notch.
     static let indicatorSideWidth: CGFloat = 110
     var indicatorSize: CGSize {
-        CGSize(width: notchSize.width + 2 * Self.indicatorSideWidth, height: closedHeight)
+        CGSize(width: notchSize.width + 2 * Self.indicatorSideWidth, height: notchSize.height)
     }
 
     /// A running timer (with the music, when playing) on both sides of the closed notch.
     static let timerSideWidth: CGFloat = 92
     var timerSize: CGSize {
-        CGSize(width: notchSize.width + 2 * Self.timerSideWidth, height: closedHeight)
+        CGSize(width: notchSize.width + 2 * Self.timerSideWidth, height: notchSize.height)
     }
 
     /// The card the notch folds down into when a timer ends.

@@ -5,6 +5,8 @@ struct NotchView: View {
     let model: NotchViewModel
 
     private var isOpen: Bool { model.state == .open }
+    /// How far the mic/camera outline sits below the notch's edge.
+    private static let outlineDrop: CGFloat = 2.5
     /// Open or playing the intro: uses the open notch's shape and background.
     private var isExpanded: Bool {
         isOpen || model.isShowingIntro || model.isShowingAppearancePreview || model.isTimerFinished
@@ -31,17 +33,20 @@ struct NotchView: View {
             }
             // Microphone (orange) or camera (green) in use: a thin outline around the notch.
             // Stroked on the edge and clipped, so the line sits just inside it.
+            .clipShape(shape)
+            // Drawn after the clip and moved down a little, so the outline shows just
+            // below the hardware notch while the notch itself keeps its size.
             .overlay {
                 if let colors = privacyColors {
                     PrivacyOutline(shape: shape, colors: colors, glow: false)
+                        .offset(y: Self.outlineDrop)
                         .transition(.opacity)
                 }
             }
-            .clipShape(shape)
-            // The optional glow spreads outside the notch, so it's drawn after the clip.
             .background {
                 if let colors = privacyColors, model.settings.privacyGlow {
                     PrivacyOutline(shape: shape, colors: colors, glow: true)
+                        .offset(y: Self.outlineDrop)
                         .transition(.opacity)
                 }
             }
