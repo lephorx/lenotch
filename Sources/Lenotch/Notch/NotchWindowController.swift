@@ -333,7 +333,7 @@ final class NotchWindowController {
         model.isPeeking = true
         let end = DispatchWorkItem { [weak self] in self?.model.isPeeking = false }
         peekEnd = end
-        DispatchQueue.main.asyncAfter(deadline: .now() + Self.peekDuration, execute: end)
+        DispatchQueue.main.asyncAfter(deadline: .now() + model.settings.trackPeekDuration, execute: end)
     }
 
     private func handle(_ event: NSEvent) {

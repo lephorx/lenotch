@@ -421,6 +421,16 @@ private struct MusicSettings: View {
                 }
                 Section {
                     Toggle("Peek when the song changes", isOn: $settings.peekOnTrackChange)
+                    if settings.peekOnTrackChange {
+                        LabeledContent("Show for") {
+                            HStack {
+                                Slider(value: $settings.trackPeekDuration, in: 1...10, step: 0.5)
+                                Text("\(settings.trackPeekDuration, format: .number.precision(.fractionLength(1))) s")
+                                    .monospacedDigit()
+                                    .frame(width: 44, alignment: .trailing)
+                            }
+                        }
+                    }
                 } footer: {
                     Text("Briefly shows the new song's cover and title in the closed notch.")
                 }
