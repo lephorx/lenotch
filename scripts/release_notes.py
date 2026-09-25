@@ -45,7 +45,9 @@ def main():
         items = commit_notes(tag) or ["Small fixes and improvements."]
         markdown = "\n".join(f"- {item}" for item in items)
     (out / "release-notes.md").write_text(markdown + "\n")
-    lis = "".join(f"<li>{html.escape(item)}</li>" for item in items)
+    # **bold** in the notes becomes <strong> in Sparkle's update dialog.
+    lis = "".join(f"<li>{re.sub(r'[*][*](.+?)[*][*]', r'<strong>\\1</strong>', html.escape(item))}</li>"
+                  for item in items)
     (out / "Lenotch.html").write_text(f"<h2>What's new in Lenotch {html.escape(tag.lstrip('v'))}</h2><ul>{lis}</ul>\n")
     print(markdown)
 
