@@ -2,14 +2,18 @@ import ServiceManagement
 import Sparkle
 import SwiftUI
 
-/// Settings pages, grouped in the sidebar by what you want to change: how the notch
-/// behaves and looks, each feature with its own page, and privacy.
+/// Settings pages, grouped in the sidebar by where things are: the notch itself, the
+/// features inside the open notch, what shows beside the closed notch, and privacy.
 enum SettingsSection: String, CaseIterable, Identifiable {
-    case general, look, music, calendar, weather, crypto, shelf, camera, aiUsage, permissions
+    case general, look
+    case music, calendar, weather, shelf, timer, camera, aiUsage
+    case volumeBrightness, micCamera, network, crypto
+    case permissions
 
     enum Group: String, CaseIterable {
         case notch = "Notch"
         case features = "Features"
+        case besideNotch = "Beside the Notch"
         case privacy = "Privacy"
     }
 
@@ -18,8 +22,9 @@ enum SettingsSection: String, CaseIterable, Identifiable {
     var group: Group {
         switch self {
         case .general, .look: .notch
+        case .music, .calendar, .weather, .shelf, .timer, .camera, .aiUsage: .features
+        case .volumeBrightness, .micCamera, .network, .crypto: .besideNotch
         case .permissions: .privacy
-        default: .features
         }
     }
 
@@ -30,10 +35,14 @@ enum SettingsSection: String, CaseIterable, Identifiable {
         case .music: "Music"
         case .calendar: "Calendar"
         case .weather: "Weather"
-        case .crypto: "Crypto"
         case .shelf: "Shelf"
-        case .camera: "Camera"
+        case .timer: "Timer"
+        case .camera: "Camera Mirror"
         case .aiUsage: "AI Usage"
+        case .volumeBrightness: "Volume & Brightness"
+        case .micCamera: "Mic & Camera"
+        case .network: "Network"
+        case .crypto: "Crypto"
         case .permissions: "Permissions"
         }
     }
@@ -45,10 +54,14 @@ enum SettingsSection: String, CaseIterable, Identifiable {
         case .music: "music.note"
         case .calendar: "calendar"
         case .weather: "cloud.sun.fill"
-        case .crypto: "bitcoinsign"
         case .shelf: "tray.full.fill"
+        case .timer: "timer"
         case .camera: "camera.fill"
         case .aiUsage: "sparkles"
+        case .volumeBrightness: "speaker.wave.2.fill"
+        case .micCamera: "mic.fill"
+        case .network: "arrow.up.arrow.down"
+        case .crypto: "bitcoinsign"
         case .permissions: "hand.raised.fill"
         }
     }
@@ -61,10 +74,14 @@ enum SettingsSection: String, CaseIterable, Identifiable {
         case .music: .pink
         case .calendar: .red
         case .weather: .cyan
-        case .crypto: .yellow
         case .shelf: .blue
+        case .timer: .orange
         case .camera: .teal
-        case .aiUsage: .orange
+        case .aiUsage: .purple
+        case .volumeBrightness: .blue
+        case .micCamera: .orange
+        case .network: .mint
+        case .crypto: .yellow
         case .permissions: .green
         }
     }
@@ -73,7 +90,8 @@ enum SettingsSection: String, CaseIterable, Identifiable {
     var keywords: [String] {
         switch self {
         case .general: ["open", "hover", "click", "delay", "shortcut", "keyboard", "menu bar", "icon", "login",
-                        "startup", "update", "welcome", "intro", "peek", "what's new", "release notes", "changelog", "volume", "brightness", "indicator", "hud", "accessibility", "microphone", "mic", "privacy", "recording", "network", "download", "upload", "speed", "timer", "alarm", "countdown", "silent"]
+                        "startup", "update", "welcome", "intro", "peek", "what's new", "release notes", "changelog",
+                        "help", "swipe"]
         case .look: ["style", "black", "glass", "liquid", "opacity", "transparent", "colour", "color", "gradient",
                      "fade", "battery", "percentage", "look", "appearance", "theme"]
         case .music: ["music", "song", "player", "spotify", "apple music", "youtube", "source", "shuffle", "repeat",
@@ -81,10 +99,15 @@ enum SettingsSection: String, CaseIterable, Identifiable {
                       "progress", "visualizer", "audio", "sound", "peek", "track change"]
         case .calendar: ["calendar", "events", "month", "day strip", "reminders", "schedule", "date"]
         case .weather: ["weather", "temperature", "city", "location", "celsius", "fahrenheit", "forecast"]
-        case .crypto: ["crypto", "bitcoin", "ethereum", "price", "coin", "ticker", "btc", "eth", "stocks"]
         case .shelf: ["shelf", "files", "drop", "drag", "airdrop", "share"]
+        case .timer: ["timer", "alarm", "countdown", "silent", "stopwatch"]
         case .camera: ["camera", "mirror", "video", "face"]
         case .aiUsage: ["ai", "usage", "claude", "codex", "cursor", "copilot", "limits", "provider", "tokens"]
+        case .volumeBrightness: ["volume", "brightness", "indicator", "hud", "osd", "keys", "accessibility", "sound"]
+        case .micCamera: ["microphone", "mic", "camera", "privacy", "recording", "outline", "glow", "orange", "green",
+                          "call", "in use"]
+        case .network: ["network", "download", "upload", "speed", "internet", "wifi", "transfer"]
+        case .crypto: ["crypto", "bitcoin", "ethereum", "price", "coin", "ticker", "btc", "eth", "stocks"]
         case .permissions: ["permission", "privacy", "allow", "access", "security"]
         }
     }
@@ -159,7 +182,7 @@ struct SettingsView: View {
     private var detail: some View {
         switch section ?? .general {
         case .general:
-            GeneralSettings(settings: settings, permissions: permissions, updater: updater, showOnboarding: showOnboarding, showWhatsNew: showWhatsNew, playIntro: playIntro)
+            GeneralSettings(settings: settings, updater: updater, showOnboarding: showOnboarding, showWhatsNew: showWhatsNew, playIntro: playIntro)
         case .look:
             LookSettings(settings: settings)
         case .music:
@@ -168,8 +191,6 @@ struct SettingsView: View {
             CalendarSettings(settings: settings, permissions: permissions)
         case .weather:
             Form { WeatherSection(settings: settings) }.formStyle(.grouped)
-        case .crypto:
-            CryptoSettings(settings: settings)
         case .shelf:
             ShelfSettings(settings: settings, shelf: shelf)
         case .camera:
@@ -183,6 +204,16 @@ struct SettingsView: View {
             .formStyle(.grouped)
         case .aiUsage:
             AIUsageSettings(settings: settings)
+        case .timer:
+            TimerSettings(settings: settings)
+        case .volumeBrightness:
+            VolumeBrightnessSettings(settings: settings, permissions: permissions)
+        case .micCamera:
+            MicCameraSettings(settings: settings)
+        case .network:
+            NetworkSettings(settings: settings)
+        case .crypto:
+            CryptoSettings(settings: settings)
         case .permissions:
             Form {
                 Section {
@@ -201,7 +232,6 @@ struct SettingsView: View {
 /// How the notch opens, shortcuts, the menu bar icon, startup and help.
 private struct GeneralSettings: View {
     @Bindable var settings: AppSettings
-    let permissions: PermissionCenter
     let updater: SPUUpdater
     let showOnboarding: () -> Void
     let showWhatsNew: () -> Void
@@ -238,33 +268,6 @@ private struct GeneralSettings: View {
                 Text("Keyboard shortcuts")
             } footer: {
                 Text("Work in any app. Swipe up on the open notch to close it.")
-            }
-            Section {
-                Toggle("Volume", isOn: $settings.showVolumeIndicator)
-                Toggle("Brightness", isOn: $settings.showBrightnessIndicator)
-                permissions.accessibilityToggle("Hide the macOS indicator", isEnabled: $settings.hideSystemIndicator)
-                    .disabled(!settings.showVolumeIndicator && !settings.showBrightnessIndicator)
-            } header: {
-                Text("Show changes in the notch")
-            } footer: {
-                Text("The level appears beside the notch for a moment. Hiding macOS's own indicator needs Accessibility, so Lenotch can handle the volume and brightness keys itself.")
-            }
-            Section {
-                Toggle("Timer button in the notch", isOn: $settings.showTimer)
-                Toggle("Silent timers", isOn: $settings.timerSilent)
-                    .disabled(!settings.showTimer)
-            } header: {
-                Text("Timer")
-            } footer: {
-                Text("Start a timer from the open notch. It counts down beside the notch, and when it ends the notch folds down and the alarm rings for 10 seconds (or until you click ×). Silent timers skip the sound.")
-            }
-            Section {
-                Toggle("Microphone and camera in use", isOn: $settings.showPrivacyIndicator)
-                Toggle("Glow", isOn: $settings.privacyGlow)
-                    .disabled(!settings.showPrivacyIndicator)
-                Toggle("Network speed during downloads", isOn: $settings.showNetworkSpeed)
-            } footer: {
-                Text("An orange outline around the notch while an app uses the microphone (green for the camera, both during a video call), with an optional glow. Download and upload speed shows beside the notch while a big transfer runs and no music plays. No permission needed.")
             }
             Section {
                 Toggle("Show icon in the menu bar", isOn: $settings.showMenuBarIcon)
