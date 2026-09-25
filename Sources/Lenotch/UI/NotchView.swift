@@ -7,7 +7,8 @@ struct NotchView: View {
     private var isOpen: Bool { model.state == .open }
     /// Open or playing the intro: uses the open notch's shape and background.
     private var isExpanded: Bool {
-        isOpen || model.isShowingIntro || model.isShowingAppearancePreview || (model.isPeeking && model.indicator == nil)
+        isOpen || model.isShowingIntro || model.isShowingAppearancePreview || model.isTimerFinished
+            || (model.isPeeking && model.indicator == nil)
     }
 
     var body: some View {
@@ -47,6 +48,9 @@ struct NotchView: View {
             .animation(.spring(response: 0.42, dampingFraction: 0.82), value: model.showsPrivacy)
             .animation(.spring(response: 0.42, dampingFraction: 0.82), value: model.showsCrypto)
             .animation(.spring(response: 0.42, dampingFraction: 0.82), value: model.showsNetwork)
+            .animation(.spring(response: 0.42, dampingFraction: 0.82), value: model.timer.isActive)
+            // Folding down when the timer ends: a little bouncier than the peek.
+            .animation(.spring(response: 0.5, dampingFraction: 0.62), value: model.isTimerFinished)
             // Turning the ticker on, or picking other coins, fetches right away.
             .task(id: "\(model.settings.showCrypto)\(model.settings.cryptoCoins)\(model.settings.cryptoCurrency)") {
                 model.crypto.refresh()
@@ -76,12 +80,18 @@ struct NotchView: View {
         } else if isOpen {
             ExpandedView(model: model)
                 .transition(.blurReplace.combined(with: .scale(0.92, anchor: .top)))
+        } else if model.isTimerFinished {
+            TimerDoneView(model: model)
+                .transition(.opacity.combined(with: .scale(0.95, anchor: .top)))
         } else if let indicator = model.indicator {
             IndicatorView(indicator: indicator, notchWidth: model.geometry.notchSize.width)
                 .transition(.opacity)
         } else if model.isPeeking, let track = model.media.track {
             PeekView(model: model, track: track)
                 .transition(.opacity.combined(with: .scale(0.95, anchor: .top)))
+        } else if model.timer.isActive {
+            TimerLiveView(model: model)
+                .transition(.opacity)
         } else if model.showsLiveActivity {
             LiveActivityView(model: model)
                 .transition(.opacity)

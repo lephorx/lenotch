@@ -40,6 +40,13 @@ final class NotchViewModel {
     var isPeeking = false
     /// A volume or brightness change showing beside the closed notch.
     var indicator: SystemIndicator?
+    let timer = NotchTimer()
+    /// The timer presets/controls cover the open notch's page.
+    var isTimerPanelVisible = false
+    /// A timer just ended: the notch folds down with a ringing bell.
+    var isTimerFinished = false
+    /// "5 min timer", for the done card.
+    var finishedTimerLabel = ""
     /// Transfer speed while a download or upload runs (nil when quiet).
     var network: NetworkMonitor.Speed?
     var showsNetwork: Bool { settings.showNetworkSpeed && network != nil }
@@ -194,6 +201,10 @@ final class NotchViewModel {
 
     /// Switches pages with a slide in the matching direction.
     func select(_ page: NotchPage) {
+        // Choosing a tab leaves the timer panel.
+        if isTimerPanelVisible {
+            withAnimation(Self.pageSpring) { isTimerPanelVisible = false }
+        }
         guard page != visiblePage else { return }
         // Set the direction first and switch on the next run-loop turn, so the
         // outgoing page already knows which way to leave.
@@ -215,12 +226,14 @@ final class NotchViewModel {
 
     var currentSize: CGSize {
         if isShowingIntro || isShowingAppearancePreview { return geometry.introSize }
+        if isTimerFinished, state == .closed { return geometry.timerDoneSize }
         if indicator != nil, state == .closed { return geometry.indicatorSize }
         if isPeeking, state == .closed { return geometry.peekSize }
         return switch state {
         case .open: openSize(for: visiblePage)
         case .closed:
-            showsLiveActivity ? geometry.liveSize
+            timer.isActive ? geometry.timerSize
+                : showsLiveActivity ? geometry.liveSize
                 : showsNetwork || showsCrypto ? geometry.indicatorSize : geometry.closedSize
         }
     }

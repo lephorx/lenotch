@@ -32,6 +32,7 @@ final class NotchWindowController {
     /// Waits for Accessibility to be allowed in System Settings, then starts the key tap.
     private var accessibilityWait: Timer?
     private var indicatorEnd: DispatchWorkItem?
+    private var timerDoneEnd: DispatchWorkItem?
     private static let indicatorDuration = 1.6
     /// Horizontal finger travel (points) that counts as a tab swipe.
     private static let swipeThreshold: CGFloat = 60
@@ -76,6 +77,7 @@ final class NotchWindowController {
         }
         privacyMonitor.onChange = { [weak self] activity in self?.model.privacy = activity }
         networkMonitor.onChange = { [weak self] speed in self?.model.network = speed }
+        model.timer.onFinish = { [weak self] in self?.timerFinished() }
         mediaKeys.onKey = { [weak self] key, fine in self?.handleMediaKey(key, fine: fine) ?? false }
         followIndicatorSettings()
         installMouseMonitors()
@@ -329,6 +331,31 @@ final class NotchWindowController {
         DispatchQueue.main.asyncAfter(deadline: .now() + Self.indicatorDuration, execute: end)
     }
 
+    /// The notch folds down with a ringing bell and a chime; it folds back up after a
+    /// while or when the pointer opens the notch.
+    private func timerFinished() {
+        guard !model.isShowingIntro, !model.isShowingAppearancePreview else { return }
+        let minutes = Int((model.timer.lastDuration / 60).rounded())
+        model.finishedTimerLabel = minutes >= 60 && minutes % 60 == 0 ? "\(minutes / 60) h timer"
+            : minutes >= 1 ? "\(minutes) min timer" : "\(Int(model.timer.lastDuration)) s timer"
+        if model.state == .open {
+            cancelPending()
+            setState(.closed)
+            hoverOpenBlocked = true
+        }
+        peekEnd?.cancel()
+        model.isPeeking = false
+        model.isTimerFinished = true
+        NSSound(named: "Glass")?.play()
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.2) { [weak self] in
+            if self?.model.isTimerFinished == true { NSSound(named: "Glass")?.play() }
+        }
+        timerDoneEnd?.cancel()
+        let end = DispatchWorkItem { [weak self] in self?.model.isTimerFinished = false }
+        timerDoneEnd = end
+        DispatchQueue.main.asyncAfter(deadline: .now() + 8, execute: end)
+    }
+
     /// Shows the new song in the closed notch, if turned on. Unlike the shortcut it
     /// never closes an open notch, and a showing peek just stays up longer.
     private func peekForTrackChange() {
@@ -412,11 +439,14 @@ final class NotchWindowController {
         if state == .open {
             peekEnd?.cancel()
             model.isPeeking = false
+            timerDoneEnd?.cancel()
+            model.isTimerFinished = false
             indicatorEnd?.cancel()
             model.indicator = nil
         } else {
             openedByKeyboard = false
             model.setUsageHover(nil)
+            model.isTimerPanelVisible = false
         }
         if state == .closed, model.isMirrorVisible {
             // The camera closes together with the notch.
@@ -480,6 +510,11 @@ final class NotchWindowController {
                     self.model.privacy = PrivacyActivity(micApps: parts.count > 2 ? [parts[2]] : [],
                                                          isMicOn: kind == "mic" || kind == "both",
                                                          isCameraOn: kind == "cam" || kind == "both")
+                case "timer" where parts.count == 2:
+                    // Starts a timer of N seconds.
+                    if let seconds = Double(parts[1]) { self.model.timer.start(seconds) }
+                case "timerpanel":
+                    self.model.isTimerPanelVisible.toggle()
                 case "mediakey" where parts.count == 2:
                     // Runs a taken-over key: volup, voldown, mute, brightup, brightdown.
                     let keys: [String: MediaKeyTap.Key] = ["volup": .volumeUp, "voldown": .volumeDown, "mute": .mute,
