@@ -43,6 +43,10 @@ final class NotchWindowController {
     /// has left the notch once.
     private var hoverOpenBlocked = false
     private var swipeHandled = false
+    private var swipeAxis: Axis?
+    private var axisTravel = CGSize.zero
+    /// Travel (points) before a gesture's direction is decided.
+    private static let axisLockDistance: CGFloat = 8
     private var lastScroll = Date.distantPast
 
     init(media: NowPlayingService, settings: AppSettings, battery: BatteryMonitor, shelf: ShelfStore,
@@ -155,11 +159,15 @@ final class NotchWindowController {
         #if DEBUG
         if debugHoldOpen { return event }
         #endif
-        // Sideways swipes scroll the calendar's day strip and a full shelf instead
-        // (about five files fit without scrolling); vertical ones scroll the event list.
-        let canSwitchTabs = model.pages.count > 1 && !model.isOverHorizontalScroller
+        // Over the calendar, scrolling scrolls it (day strip, month, events) and never
+        // switches tabs; a full shelf scrolls sideways too (about five files fit).
+        // Frames are checked by position, since hover doesn't reliably reach this panel.
+        let point = panel.contentView.map { $0.convert(event.locationInWindow, from: nil) } ?? .zero
+        let overCalendar = model.calendarFrame?.contains(point) ?? false
+        let overEventList = model.eventListFrame?.contains(point) ?? false
+        let canSwitchTabs = model.pages.count > 1 && !overCalendar
             && !(model.visiblePage == .shelf && model.shelf.items.count > 5)
-        let canClose = !model.isOverVerticalScroller
+        let canClose = !overEventList
         // Ignore the inertia that keeps scrolling after the fingers lift.
         guard event.momentumPhase.isEmpty else { return swipeHandled ? nil : event }
 
@@ -168,13 +176,26 @@ final class NotchWindowController {
             swipeDistance = 0
             verticalSwipeDistance = 0
             swipeHandled = false
+            swipeAxis = nil
+            axisTravel = .zero
         }
         lastScroll = now
+
+        // Each gesture counts for one direction only, chosen from its first few points of
+        // travel, so a slightly diagonal vertical scroll can't add up to a tab switch.
+        if swipeAxis == nil {
+            axisTravel.width += abs(event.scrollingDeltaX)
+            axisTravel.height += abs(event.scrollingDeltaY)
+            guard max(axisTravel.width, axisTravel.height) > Self.axisLockDistance else {
+                return swipeHandled ? nil : event
+            }
+            swipeAxis = axisTravel.width > axisTravel.height * 1.5 ? .horizontal : .vertical
+        }
 
         // Normalise to finger movement regardless of the natural scrolling setting
         // (right and up are positive).
         let inverted = event.isDirectionInvertedFromDevice
-        if abs(event.scrollingDeltaX) > abs(event.scrollingDeltaY) {
+        if swipeAxis == .horizontal {
             guard canSwitchTabs else { return event }
             swipeDistance += inverted ? event.scrollingDeltaX : -event.scrollingDeltaX
         } else {
