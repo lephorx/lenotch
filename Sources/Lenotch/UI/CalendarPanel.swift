@@ -33,13 +33,14 @@ struct CalendarPanel: View {
                         .contentTransition(.numericText())
                         .animation(.easeOut(duration: 0.2), value: calendar.selectedDay)
                     DayStrip(calendar: calendar, width: width)
-                        .onHover { model.isOverHorizontalScroller = $0 }
                     content(now: context.date)
                 }
             }
         }
         .frame(width: width, alignment: .leading)
         .frame(maxHeight: .infinity, alignment: .top)
+        // Scrolling anywhere over the calendar scrolls it instead of switching tabs.
+        .onGeometryChange(for: CGRect.self) { $0.frame(in: .global) } action: { model.calendarFrame = $0 }
         // Reload while visible only; the task stops when the notch closes.
         .task {
             calendar.select(Date())
@@ -51,8 +52,8 @@ struct CalendarPanel: View {
         .onChange(of: model.settings.hiddenCalendarIDs) { _, _ in calendar.refresh() }
         .onChange(of: model.settings.hiddenReminderListIDs) { _, _ in calendar.refresh() }
         .onDisappear {
-            model.isOverHorizontalScroller = false
-            model.isOverVerticalScroller = false
+            model.calendarFrame = nil
+            model.eventListFrame = nil
         }
     }
 
@@ -114,7 +115,10 @@ struct CalendarPanel: View {
                             }
                         }
                     }
-                    .onHover { model.isOverVerticalScroller = $0 }
+                    .onGeometryChange(for: CGRect.self) { $0.frame(in: .global) } action: {
+                        model.eventListFrame = $0
+                    }
+                    .onDisappear { model.eventListFrame = nil }
                     .onAppear { scrollToNextEvent(proxy: proxy) }
                     .onChange(of: calendar.events.map(\.id)) { _, _ in scrollToNextEvent(proxy: proxy) }
                     .onChange(of: model.settings.autoScrollCalendar) { _, enabled in

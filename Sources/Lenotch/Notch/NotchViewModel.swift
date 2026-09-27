@@ -79,12 +79,11 @@ final class NotchViewModel {
         usageHover = hover
         onUsageHoverChange?()
     }
-    /// Pointer is over a sideways-scrolling area (the calendar's day strip), where
-    /// two-finger swipes scroll instead of switching tabs.
-    var isOverHorizontalScroller = false
-    /// Pointer is over a vertically scrolling list (the calendar's events), where
-    /// swiping up scrolls instead of closing the notch.
-    var isOverVerticalScroller = false
+    /// Where the calendar is in the notch window (top-left origin). Scrolling there
+    /// scrolls the calendar and never switches tabs.
+    @ObservationIgnored var calendarFrame: CGRect?
+    /// Where the calendar's event list is; swiping up there scrolls instead of closing the notch.
+    @ObservationIgnored var eventListFrame: CGRect?
     /// The camera popup beside the notch; closes with the notch or on a second click.
     var isMirrorVisible = false
     let openSettings: () -> Void
