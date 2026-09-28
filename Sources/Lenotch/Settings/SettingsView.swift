@@ -91,7 +91,7 @@ enum SettingsSection: String, CaseIterable, Identifiable {
         switch self {
         case .general: ["open", "hover", "click", "delay", "shortcut", "keyboard", "menu bar", "icon", "login",
                         "startup", "update", "welcome", "intro", "peek", "what's new", "release notes", "changelog",
-                        "help", "swipe"]
+                        "help", "swipe", "version", "about"]
         case .look: ["style", "black", "glass", "liquid", "opacity", "transparent", "colour", "color", "gradient",
                      "fade", "battery", "percentage", "look", "appearance", "theme"]
         case .music: ["music", "song", "player", "spotify", "apple music", "youtube", "source", "shuffle", "repeat",
@@ -284,6 +284,10 @@ private struct GeneralSettings: View {
                 ))
             }
             Section("Help") {
+                LabeledContent("Version") {
+                    Text(Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "–")
+                        .textSelection(.enabled)
+                }
                 LabeledContent("What's new in this version") {
                     Button("Show…", action: showWhatsNew)
                 }
