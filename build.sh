@@ -9,7 +9,7 @@
 #   CONFIG=debug|release      build configuration (default release)
 #   ARCHS="arm64 x86_64"      architectures (default: this Mac's)
 #   VERSION=2.1 BUILD=42      override the app's version and build number
-#   SIGN_IDENTITY="…"          signing identity (default: your Apple Development cert, else ad-hoc)
+#   SIGN_IDENTITY="…"          signing identity (default: the Lenotch cert, else Apple Development, else ad-hoc)
 set -euo pipefail
 cd "$(dirname "$0")"
 
@@ -50,9 +50,13 @@ codesign --force --sign - "$SPARKLE_DEST/Versions/B/Autoupdate"
 codesign --force --sign - "$SPARKLE_DEST/Versions/B/Updater.app"
 codesign --force --sign - "$SPARKLE_DEST"
 # Sign with a real certificate when there is one: macOS keeps permissions (calendar,
-# camera, automation…) for the same signer across builds. Ad-hoc signatures are tied
-# to the exact binary, so every rebuild would lose them. SIGN_IDENTITY=- forces ad-hoc.
-IDENTITY="${SIGN_IDENTITY:-$(security find-identity -v -p codesigning 2>/dev/null \
+# camera, automation…) for the same signer across builds and updates. Ad-hoc signatures
+# are tied to the exact binary, so every rebuild or update would lose them.
+# Releases use the self-signed "Lenotch" certificate (imported on CI from secrets); it's
+# not trusted by the system, so it's looked up without -v. SIGN_IDENTITY=- forces ad-hoc.
+IDENTITY="${SIGN_IDENTITY:-$(security find-identity -p codesigning 2>/dev/null \
+  | grep -q '"Lenotch"' && echo Lenotch)}"
+IDENTITY="${IDENTITY:-$(security find-identity -v -p codesigning 2>/dev/null \
   | sed -n 's/.*"\(Apple Development: [^"]*\)".*/\1/p' | head -1)}"
 codesign --force --sign "${IDENTITY:--}" "$APP"
 echo "Signed with: ${IDENTITY:-ad-hoc}"

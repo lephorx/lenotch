@@ -30,6 +30,27 @@ jobs:
       - name: Install DMG builder
         run: brew install create-dmg
 
+      # A fixed signing certificate, so macOS keeps Lenotch's permissions across updates
+      # (ad-hoc signatures change with every build). Skipped where the secrets aren't
+      # available, e.g. pull requests from forks.
+      - name: Import signing certificate
+        env:
+          P12: ${{ secrets.LENOTCH_SIGNING_P12 }}
+          P12_PASSWORD: ${{ secrets.LENOTCH_SIGNING_PASSWORD }}
+        run: |
+          if [ -z "$P12" ]; then echo "No signing certificate; building ad-hoc."; exit 0; fi
+          KEYCHAIN="$RUNNER_TEMP/signing.keychain-db"
+          KEYCHAIN_PASSWORD="$(openssl rand -base64 24)"
+          echo "$P12" | base64 --decode > "$RUNNER_TEMP/lenotch.p12"
+          security create-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN"
+          security set-keychain-settings -lut 3600 "$KEYCHAIN"
+          security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN"
+          security import "$RUNNER_TEMP/lenotch.p12" -k "$KEYCHAIN" -P "$P12_PASSWORD" -T /usr/bin/codesign
+          security set-key-partition-list -S apple-tool:,apple: -s -k "$KEYCHAIN_PASSWORD" "$KEYCHAIN" > /dev/null
+          security list-keychains -d user -s "$KEYCHAIN" $(security list-keychains -d user | tr -d '"')
+          rm "$RUNNER_TEMP/lenotch.p12"
+          security find-identity -p codesigning "$KEYCHAIN"
+
       - name: Build universal DMG
         env:
           ARCHS: arm64 x86_64
@@ -40,6 +61,7 @@ jobs:
             export VERSION="${GITHUB_REF_NAME#v}"
           fi
           ./build.sh dmg
+          codesign -dvv build/Lenotch.app 2>&1 | grep -E "Authority|Signature"
 
       - name: Checksum
         run: shasum -a 256 build/Lenotch.dmg > build/Lenotch.dmg.sha256
