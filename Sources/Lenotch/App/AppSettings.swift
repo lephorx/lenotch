@@ -75,6 +75,8 @@ final class AppSettings {
     @ObservationIgnored var onShortcutsChange: (() -> Void)?
     /// Seconds the pointer has to rest on the notch before it opens in hover mode.
     var hoverDelay: Double { didSet { save(hoverDelay, "hoverDelay") } }
+    /// Show the battery glyph and optional percentage in the notch header.
+    var showBatteryIndicator: Bool { didSet { save(showBatteryIndicator, "showBatteryIndicator") } }
     var showBatteryPercentage: Bool { didSet { save(showBatteryPercentage, "showBatteryPercentage") } }
     /// The Lenotch icon in the menu bar. When hidden, Settings is reached from the
     /// notch's gear or by opening the app again.
@@ -210,6 +212,7 @@ final class AppSettings {
         toggleShortcut = shortcut("toggleShortcut", .toggleDefault)
         peekShortcut = shortcut("peekShortcut", .peekDefault)
         hoverDelay = defaults.object(forKey: "hoverDelay") as? Double ?? 0.12
+        showBatteryIndicator = bool("showBatteryIndicator", true)
         showBatteryPercentage = bool("showBatteryPercentage", true)
         showMenuBarIcon = bool("showMenuBarIcon", true)
         showCalendar = bool("showCalendar", true)

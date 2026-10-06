@@ -40,6 +40,9 @@ struct MonthGrid: View {
             .id(calendar.displayedMonth)
             .transition(.opacity)
         }
+        .calendarNavigation(stepDistance: 60, oneStepPerGesture: true) { offset in
+            calendar.showMonth(offset: offset)
+        }
         .animation(.easeOut(duration: 0.2), value: calendar.displayedMonth)
     }
 
