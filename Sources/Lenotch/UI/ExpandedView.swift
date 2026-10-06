@@ -95,7 +95,7 @@ struct ExpandedView: View {
                     }
                 }
                 HeaderButton(symbol: "gearshape.fill", label: "Settings", action: model.openSettings)
-                if model.battery.hasBattery {
+                if settings.showBatteryIndicator, model.battery.hasBattery {
                     BatteryView(battery: model.battery, showsPercentage: settings.showBatteryPercentage)
                 }
             }

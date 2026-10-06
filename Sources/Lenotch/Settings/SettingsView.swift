@@ -350,7 +350,9 @@ private struct LookSettings: View {
             }
             GradientSettings(settings: settings, appearance: settings.appearance)
             Section("Notch header") {
+                Toggle("Show battery indicator", isOn: $settings.showBatteryIndicator)
                 Toggle("Show battery percentage", isOn: $settings.showBatteryPercentage)
+                    .disabled(!settings.showBatteryIndicator)
             }
         }
         .formStyle(.grouped)
