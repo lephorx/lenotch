@@ -62,6 +62,8 @@ final class AppSettings {
     var lastSeenVersion: String? { didSet { defaults.set(lastSeenVersion, forKey: "lastSeenVersion") } }
 
     // MARK: General
+    var showOnAllScreens: Bool { didSet { save(showOnAllScreens, "showOnAllScreens"); onDisplaySettingsChange?() } }
+    @ObservationIgnored var onDisplaySettingsChange: (() -> Void)?
     var openMode: OpenMode { didSet { save(openMode.rawValue, "openMode") } }
     /// Global shortcuts; nil turns one off.
     var toggleShortcut: KeyShortcut? {
@@ -198,6 +200,7 @@ final class AppSettings {
         hasCompletedOnboarding = bool("hasCompletedOnboarding", false)
         hasPlayedIntro = bool("hasPlayedIntro", false)
         lastSeenVersion = defaults.string(forKey: "lastSeenVersion")
+        showOnAllScreens = bool("showOnAllScreens", true)
         openMode = defaults.string(forKey: "openMode").flatMap(OpenMode.init) ?? .hover
         func shortcut(_ key: String, _ fallback: KeyShortcut) -> KeyShortcut? {
             guard let data = defaults.data(forKey: key) else { return fallback }

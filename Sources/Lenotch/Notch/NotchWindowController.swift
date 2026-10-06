@@ -1,9 +1,10 @@
 import AppKit
 import SwiftUI
 
-/// Owns the notch panel: places it on the notched screen, and opens/closes the
+/// Owns one screen’s notch panel, and opens/closes the
 /// notch on hover or click, and when files are dragged onto it.
 final class NotchWindowController {
+    private let handlesMediaKeys: Bool
     private let panel: NotchPanel
     /// Separate panel for the camera popup to the right of the notch.
     private let mirrorPanel: NotchPanel
@@ -50,8 +51,9 @@ final class NotchWindowController {
     private var lastScroll = Date.distantPast
 
     init(media: NowPlayingService, settings: AppSettings, battery: BatteryMonitor, shelf: ShelfStore,
-         visualizer: AudioVisualizer, openSettings: @escaping () -> Void) {
-        let geometry = NotchGeometry(screen: Self.targetScreen())
+         visualizer: AudioVisualizer, screen: NSScreen, handlesMediaKeys: Bool, openSettings: @escaping () -> Void) {
+        self.handlesMediaKeys = handlesMediaKeys
+        let geometry = NotchGeometry(screen: screen)
         model = NotchViewModel(geometry: geometry, media: media, settings: settings,
                                battery: battery, shelf: shelf, visualizer: visualizer,
                                openSettings: openSettings)
@@ -71,10 +73,6 @@ final class NotchWindowController {
         tooltipPanel.orderFrontRegardless()
         model.onUsageHoverChange = { [weak self] in self?.positionTooltip() }
         model.onOpenSizeChange = { [weak self] in self?.positionMirror() }
-        media.onTrackChange = { [weak self] in
-            // After the current update, so the peek shows the new song's details.
-            DispatchQueue.main.async { self?.peekForTrackChange() }
-        }
 
         indicators.onChange = { [weak self] indicator in
             DispatchQueue.main.async { self?.showIndicator(indicator) }
@@ -89,14 +87,27 @@ final class NotchWindowController {
         #if DEBUG
         installDebugHooks()
         #endif
-        NotificationCenter.default.addObserver(
-            forName: NSApplication.didChangeScreenParametersNotification,
-            object: nil, queue: .main
-        ) { [weak self] _ in self?.relayout() }
     }
 
     deinit {
         monitors.forEach(NSEvent.removeMonitor)
+        accessibilityWait?.invalidate()
+        mediaKeys.stop()
+        model.camera.stop()
+        model.timer.cancel()
+        alarmSound?.stop()
+        indicators.watchesVolume = false
+        indicators.watchesBrightness = false
+        privacyMonitor.isEnabled = false
+        networkMonitor.isEnabled = false
+        pendingTransition?.cancel()
+        introEnd?.cancel()
+        peekEnd?.cancel()
+        indicatorEnd?.cancel()
+        timerDoneEnd?.cancel()
+        panel.orderOut(nil)
+        mirrorPanel.orderOut(nil)
+        tooltipPanel.orderOut(nil)
     }
 
     /// Puts the usage bubble just below the open notch, centred on the hovered ring.
@@ -110,15 +121,11 @@ final class NotchWindowController {
                                      width: UsageTooltip.width, height: Self.tooltipHeight), display: true)
     }
 
-    /// Prefer the built-in display with a notch, otherwise the main screen.
-    private static func targetScreen() -> NSScreen {
-        NSScreen.screens.first { $0.safeAreaInsets.top > 0 } ?? NSScreen.main ?? NSScreen.screens[0]
-    }
-
-    private func relayout() {
-        model.geometry = NotchGeometry(screen: Self.targetScreen())
+    func relayout(on screen: NSScreen) {
+        model.geometry = NotchGeometry(screen: screen)
         panel.setFrame(model.geometry.windowFrame, display: true)
         positionMirror()
+        positionTooltip()
     }
 
     /// Keeps the camera popup just right of the open notch, whose width depends on the page.
@@ -155,7 +162,7 @@ final class NotchWindowController {
     /// Returns nil when the event was used for a swipe.
     /// Two-finger swipes on the open notch: sideways switches tabs, up closes it.
     private func handleSwipe(_ event: NSEvent) -> NSEvent? {
-        guard model.state == .open else { return event }
+        guard event.window === panel, model.state == .open else { return event }
         #if DEBUG
         if debugHoldOpen { return event }
         #endif
@@ -304,8 +311,8 @@ final class NotchWindowController {
         withObservationTracking {
             indicators.watchesVolume = settings.showVolumeIndicator
             indicators.watchesBrightness = settings.showBrightnessIndicator
-            mediaKeys.handlesVolume = settings.hideSystemIndicator && settings.showVolumeIndicator
-            mediaKeys.handlesBrightness = settings.hideSystemIndicator && settings.showBrightnessIndicator
+            mediaKeys.handlesVolume = handlesMediaKeys && settings.hideSystemIndicator && settings.showVolumeIndicator
+            mediaKeys.handlesBrightness = handlesMediaKeys && settings.hideSystemIndicator && settings.showBrightnessIndicator
             updateMediaKeyTap()
             privacyMonitor.isEnabled = settings.showPrivacyIndicator
             networkMonitor.isEnabled = settings.showNetworkSpeed
@@ -394,7 +401,7 @@ final class NotchWindowController {
 
     /// Shows the new song in the closed notch, if turned on. Unlike the shortcut it
     /// never closes an open notch, and a showing peek just stays up longer.
-    private func peekForTrackChange() {
+    func peekForTrackChange() {
         guard model.settings.peekOnTrackChange, model.state == .closed,
               !model.isShowingIntro, !model.isShowingAppearancePreview,
               model.media.track != nil else { return }

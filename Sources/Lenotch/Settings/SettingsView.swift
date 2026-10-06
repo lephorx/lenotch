@@ -241,6 +241,11 @@ private struct GeneralSettings: View {
 
     var body: some View {
         Form {
+            Section("Displays") {
+                Toggle("Show notch on every screen", isOn: $settings.showOnAllScreens)
+                Text("When off, the notch appears on the built-in notched display, or the main display.")
+                    .font(.caption).foregroundStyle(.secondary)
+            }
             Section("Opening") {
                 Picker("Open the notch on", selection: $settings.openMode) {
                     ForEach(OpenMode.allCases) { Text($0.title).tag($0) }
