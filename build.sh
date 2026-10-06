@@ -105,7 +105,20 @@ case "${1:-}" in
       --app-drop-link 445 165 \
       --skip-finalize \
       "$DMG" "$STAGE"
-    hdiutil attach -readwrite -nobrowse -mountpoint "$MOUNT" "$DMG" -quiet
+    # Finder/diskimages-helper can briefly keep the image busy after create-dmg
+    # detaches it. Retry EBUSY only; other mount errors must still fail the build.
+    for attempt in 1 2 3 4 5; do
+      if hdiutil attach -readwrite -nobrowse -mountpoint "$MOUNT" "$DMG"; then
+        break
+      else
+        mount_status=$?
+        if [ "$mount_status" -ne 16 ] || [ "$attempt" -eq 5 ]; then
+          exit "$mount_status"
+        fi
+        echo "Disk image is still busy; retrying mount ($attempt/5)..."
+        sleep 2
+      fi
+    done
     STYLED=0
     for attempt in 1 2 3 4 5; do
       if osascript scripts/style_dmg.applescript "$(basename "$MOUNT")" "$MOUNT"; then
