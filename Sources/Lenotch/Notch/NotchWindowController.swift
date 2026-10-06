@@ -171,6 +171,7 @@ final class NotchWindowController {
         // Frames are checked by position, since hover doesn't reliably reach this panel.
         let point = panel.contentView.map { $0.convert(event.locationInWindow, from: nil) } ?? .zero
         let overCalendar = model.calendarFrame?.contains(point) ?? false
+        guard !overCalendar else { return event }
         let overEventList = model.eventListFrame?.contains(point) ?? false
         let canSwitchTabs = model.pages.count > 1 && !overCalendar
             && !(model.visiblePage == .shelf && model.shelf.items.count > 5)

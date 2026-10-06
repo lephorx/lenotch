@@ -173,6 +173,11 @@ private struct DayStrip: View {
         .scrollTargetBehavior(.viewAligned)
         .scrollPosition(id: $centered, anchor: .center)
         .frame(width: width, height: 40)
+        .calendarNavigation(stepDistance: Self.cellWidth + Self.spacing) { offset in
+            guard let index = days.firstIndex(of: calendar.selectedDay) else { return }
+            let target = min(max(index + offset, 0), days.count - 1)
+            withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) { centered = days[target] }
+        }
         // Fade the days out towards the edges.
         .mask(LinearGradient(stops: [.init(color: .clear, location: 0), .init(color: .black, location: 0.18),
                                      .init(color: .black, location: 0.82), .init(color: .clear, location: 1)],
