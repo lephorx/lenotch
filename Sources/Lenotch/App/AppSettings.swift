@@ -277,6 +277,13 @@ final class AppSettings {
             sourceKeys += AIProvider.allCases.map(\.rawValue).filter { !sourceKeys.contains($0) }
             defaults.set(2, forKey: "usageSourcesVersion")
         }
+        // Version 3 added DeepSeek (hidden in the notch until its API key is added).
+        if defaults.integer(forKey: "usageSourcesVersion") < 3 {
+            if !sourceKeys.contains(AIProvider.deepseek.rawValue) { sourceKeys.append(AIProvider.deepseek.rawValue) }
+            defaults.set(3, forKey: "usageSourcesVersion")
+            // Observers don't run in init: save the list, or the next launch loses the addition.
+            defaults.set(sourceKeys, forKey: "aiProviders")
+        }
         usageSourceKeys = sourceKeys
         customProviders = defaults.data(forKey: "customProviders")
             .flatMap { try? JSONDecoder().decode([CustomAIProvider].self, from: $0) } ?? []

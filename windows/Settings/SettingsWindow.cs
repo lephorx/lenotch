@@ -31,6 +31,7 @@ public sealed class SettingsWindow : Window
     private CustomProvider? draft;
     private string? draftKey;
     private string testResult = "";
+    private bool editingDeepSeek;
 
     private AppSettings Settings => services.Settings;
 
@@ -457,7 +458,13 @@ public sealed class SettingsWindow : Window
 
         var keys = Settings.UsageSourceKeys;
         var builtIn = AIProviders.All.OrderBy(p => keys.IndexOf(p.Key()) is var i && i >= 0 ? i : 100 + (int)p).ToList();
-        var rows = builtIn.Select(p => SourceRow(new UsageSource(p), p.Source(), null)).ToList();
+        var rows = new List<UIElement>();
+        foreach (var provider in builtIn)
+        {
+            var detail = provider == AIProvider.DeepSeek && DeepSeekUsage.HasSavedKey ? "API key saved" : provider.Source();
+            rows.Add(SourceRow(new UsageSource(provider), detail, null));
+            if (provider == AIProvider.DeepSeek && editingDeepSeek) rows.Add(DeepSeekKeyEditor());
+        }
         yield return Group("Providers", rows.ToArray());
 
         var customs = Settings.AllCustomProviders.ToList();
@@ -511,6 +518,15 @@ public sealed class SettingsWindow : Window
         {
             controls.Children.Add(IconButton(Glyphs.ArrowUp, () => Move(key, -1)));
             controls.Children.Add(IconButton(Glyphs.ArrowDown, () => Move(key, 1)));
+        }
+        if (source.BuiltIn == AIProvider.DeepSeek)
+        {
+            controls.Children.Add(SmallButton("API key…", () =>
+            {
+                editingDeepSeek = !editingDeepSeek;
+                testResult = "";
+                ShowPage();
+            }, new Thickness(6, 0, 0, 0)));
         }
         if (custom != null)
         {
@@ -571,6 +587,59 @@ public sealed class SettingsWindow : Window
         (list[index], list[target]) = (list[target], list[index]);
         Settings.UsageSourceKeys = list;
         ShowPage();
+    }
+
+    /// DeepSeek's API key, encrypted for this Windows user.
+    private UIElement DeepSeekKeyEditor()
+    {
+        var form = new StackPanel { Margin = new Thickness(14, 4, 14, 14) };
+        var hint = Ui.Text("Create one at platform.deepseek.com → API keys. Lenotch only uses it to read your balance.",
+            12, FontWeights.Normal, SecondaryBrush);
+        hint.TextWrapping = TextWrapping.Wrap;
+        form.Children.Add(hint);
+        var key = new PasswordBox { Style = (Style)Application.Current.Resources["LenotchPasswordBox"], MinWidth = 260 };
+        form.Children.Add(Row("API key", DeepSeekUsage.HasSavedKey ? "Saved. Type to replace." : null, key, stretchControl: true));
+        var result = Ui.Text(testResult, 12, FontWeights.Normal, SecondaryBrush);
+        result.TextWrapping = TextWrapping.Wrap;
+        form.Children.Add(result);
+        var buttons = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right, Margin = new Thickness(0, 10, 0, 0) };
+        if (DeepSeekUsage.HasSavedKey)
+            buttons.Children.Add(SmallButton("Remove key", () =>
+            {
+                DeepSeekUsage.SaveApiKey("");
+                editingDeepSeek = false;
+                ShowPage();
+            }));
+        buttons.Children.Add(SmallButton("Test", async () =>
+        {
+            if (key.Password.Length > 0) DeepSeekUsage.SaveApiKey(key.Password);
+            result.Text = "Testing…";
+            try
+            {
+                var usage = await DeepSeekUsage.Fetch();
+                testResult = usage is ProviderUsage.Ok ok && ok.Windows.FirstOrDefault()?.Amount is { } balance
+                    ? $"Works: balance {balance}." : "No reading.";
+            }
+            catch (Exception error)
+            {
+                testResult = error.Message is { Length: > 0 } message ? message : "Enter a key first.";
+            }
+            result.Text = testResult;
+        }, new Thickness(8, 0, 0, 0)));
+        buttons.Children.Add(SmallButton("Cancel", () => { editingDeepSeek = false; ShowPage(); }, new Thickness(8, 0, 0, 0)));
+        var save = SmallButton("Save", () =>
+        {
+            if (key.Password.Length > 0) DeepSeekUsage.SaveApiKey(key.Password);
+            if (!Settings.UsageSourceKeys.Contains(AIProvider.DeepSeek.Key()))
+                Settings.UsageSourceKeys = Settings.UsageSourceKeys.Append(AIProvider.DeepSeek.Key()).ToList();
+            editingDeepSeek = false;
+            _ = services.AIUsage.Refresh(Settings.UsageSources, force: true);
+            ShowPage();
+        }, new Thickness(8, 0, 0, 0));
+        save.Style = (Style)Application.Current.Resources["AccentButton"];
+        buttons.Children.Add(save);
+        form.Children.Add(buttons);
+        return new Border { Background = Ui.Frozen(Color.FromRgb(0x23, 0x23, 0x26)), Child = form };
     }
 
     private UIElement ProviderEditor(CustomProvider provider, bool readOnly)

@@ -5,7 +5,7 @@ import SwiftUI
 /// Built-in coding assistants whose usage limits the notch can show. Each is read
 /// with the sign-in its own tool already keeps on this Mac; Lenotch never asks for a login.
 enum AIProvider: String, Codable, CaseIterable, Identifiable {
-    case claude, codex, cursor, copilot, grok, kimi, opencode, amp
+    case claude, codex, cursor, copilot, grok, kimi, opencode, amp, deepseek
 
     var id: String { rawValue }
 
@@ -19,6 +19,7 @@ enum AIProvider: String, Codable, CaseIterable, Identifiable {
         case .kimi: "Kimi Code"
         case .opencode: "OpenCode"
         case .amp: "Amp"
+        case .deepseek: "DeepSeek"
         }
     }
 
@@ -33,6 +34,7 @@ enum AIProvider: String, Codable, CaseIterable, Identifiable {
         case .kimi: "~/.kimi-code (Kimi Code CLI)"
         case .opencode: "~/.local/share/opencode/auth.json"
         case .amp: "~/.local/share/amp/secrets.json"
+        case .deepseek: "API key (add it here) or DEEPSEEK_API_KEY"
         }
     }
 
@@ -46,6 +48,7 @@ enum AIProvider: String, Codable, CaseIterable, Identifiable {
         case .kimi: .outline(GlyphOutline.kimi)
         case .opencode: .outline(GlyphOutline.opencode)
         case .amp: .image("glyph-amp")
+        case .deepseek: .outline(GlyphOutline.deepseek)
         }
     }
 }

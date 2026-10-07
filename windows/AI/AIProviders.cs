@@ -14,7 +14,7 @@ namespace Lenotch.AI;
 
 /// Built-in coding assistants whose usage limits the notch can show. Each is read
 /// with the sign-in its own tool already keeps on this PC; Lenotch never asks for a login.
-public enum AIProvider { Claude, Codex, Cursor, Copilot, Grok, Kimi, Opencode, Amp }
+public enum AIProvider { Claude, Codex, Cursor, Copilot, Grok, Kimi, Opencode, Amp, DeepSeek }
 
 public static class AIProviders
 {
@@ -35,6 +35,7 @@ public static class AIProviders
         AIProvider.Grok => "Grok",
         AIProvider.Kimi => "Kimi Code",
         AIProvider.Opencode => "OpenCode",
+        AIProvider.DeepSeek => "DeepSeek",
         _ => "Amp",
     };
 
@@ -48,6 +49,7 @@ public static class AIProviders
         AIProvider.Grok => @"%USERPROFILE%\.grok\auth.json (Grok CLI)",
         AIProvider.Kimi => @"%USERPROFILE%\.kimi-code (Kimi Code CLI)",
         AIProvider.Opencode => @"%USERPROFILE%\.local\share\opencode\auth.json",
+        AIProvider.DeepSeek => "API key (add it here) or DEEPSEEK_API_KEY",
         _ => @"%USERPROFILE%\.local\share\amp\secrets.json",
     };
 
@@ -60,6 +62,7 @@ public static class AIProviders
         AIProvider.Grok => GlyphOutline.Grok,
         AIProvider.Kimi => GlyphOutline.Kimi,
         AIProvider.Opencode => GlyphOutline.Opencode,
+        AIProvider.DeepSeek => GlyphOutline.Deepseek,
         _ => AmpGlyph,
     };
 

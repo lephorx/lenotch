@@ -6,6 +6,7 @@ struct AIUsageSettings: View {
     @Bindable var settings: AppSettings
 
     @State private var editing: CustomAIProvider?
+    @State private var editingDeepSeekKey = false
 
     /// Every source, enabled ones first in their saved order.
     private var allKeys: [String] {
@@ -37,7 +38,8 @@ struct AIUsageSettings: View {
                         if let source = UsageSource.resolve(key, customs: settings.allCustomProviders) {
                             SourceRow(source: source,
                                       isOn: binding(for: key),
-                                      edit: source.custom.map { custom in { edit(custom) } })
+                                      edit: source.custom.map { custom in { edit(custom) } }
+                                          ?? (key == AIProvider.deepseek.rawValue ? { editingDeepSeekKey = true } : nil))
                         }
                     }
                     .onMove(perform: move)
@@ -73,6 +75,9 @@ struct AIUsageSettings: View {
                 .foregroundStyle(.secondary)
                 .padding(.horizontal, 20)
                 .padding(.bottom, 14)
+        }
+        .sheet(isPresented: $editingDeepSeekKey) {
+            DeepSeekKeyEditor { editingDeepSeekKey = false }
         }
         .sheet(item: $editing) { provider in
             CustomProviderEditor(provider: provider,
@@ -175,7 +180,8 @@ private struct SourceRow: View {
             }
             Spacer()
             if let edit {
-                Button(source.custom?.configFile != nil ? "Open File" : "Edit…", action: edit)
+                Button(source.custom?.configFile != nil ? "Open File"
+                       : source.custom == nil ? "API Key…" : "Edit…", action: edit)
                     .buttonStyle(.borderless)
             }
             Toggle("", isOn: $isOn).labelsHidden().toggleStyle(.switch).controlSize(.small)
@@ -342,5 +348,67 @@ private struct CustomProviderEditor: View {
             if keyEdited { probe.deleteAPIKey() }
             isTesting = false
         }
+    }
+}
+
+/// Sheet for DeepSeek's API key, kept in the keychain.
+private struct DeepSeekKeyEditor: View {
+    let done: () -> Void
+    @State private var key = ""
+    @State private var result: String?
+    @State private var testing = false
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("DeepSeek API Key").font(.system(size: 15, weight: .semibold))
+            Text("Create one at platform.deepseek.com → API keys. Lenotch keeps it in your keychain and only uses it to read your balance.")
+                .font(.system(size: 11))
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+            SecureField(DeepSeekUsage.hasSavedKey ? "Saved (type to replace)" : "sk-…", text: $key)
+                .textFieldStyle(.roundedBorder)
+            if let result {
+                Text(result).font(.system(size: 11)).foregroundStyle(.secondary)
+            }
+            HStack {
+                if DeepSeekUsage.hasSavedKey {
+                    Button("Remove Key", role: .destructive) {
+                        DeepSeekUsage.saveAPIKey("")
+                        done()
+                    }
+                }
+                Spacer()
+                Button("Test") { Task { await test() } }
+                    .disabled(testing || (key.isEmpty && DeepSeekUsage.apiKey == nil))
+                Button("Cancel", action: done)
+                Button("Save") {
+                    if !key.isEmpty { DeepSeekUsage.saveAPIKey(key) }
+                    done()
+                }
+                .keyboardShortcut(.defaultAction)
+            }
+        }
+        .padding(20)
+        .frame(width: 420)
+    }
+
+    private func test() async {
+        testing = true
+        if !key.isEmpty { DeepSeekUsage.saveAPIKey(key) }
+        do {
+            let usage = try await DeepSeekUsage.fetch()
+            if case .ok(_, let windows) = usage, let balance = windows.first?.amount {
+                result = "Works: balance \(balance)."
+            } else {
+                result = "No reading."
+            }
+        } catch UsageError.problem(let message) {
+            result = message
+        } catch UsageError.notSetUp {
+            result = "Enter a key first."
+        } catch {
+            result = "Couldn't reach DeepSeek."
+        }
+        testing = false
     }
 }

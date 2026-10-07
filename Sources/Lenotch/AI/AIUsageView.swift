@@ -108,7 +108,12 @@ private struct RingCell: View {
             ZStack {
                 // Strokes are inset by half their width so they stay inside the frame.
                 Circle().inset(by: lineWidth / 2).stroke(Color(white: 0.2), lineWidth: lineWidth)
-                if let headline = usage.headline {
+                if let headline = usage.headline, headline.amount != nil {
+                    // A balance: a full ring, green while the account can be used, red when it can't.
+                    Circle()
+                        .inset(by: lineWidth / 2)
+                        .stroke(headline.used >= 1 ? UsageColor.of(1) : UsageColor.of(0), lineWidth: lineWidth)
+                } else if let headline = usage.headline {
                     Circle()
                         .inset(by: lineWidth / 2)
                         .trim(from: 0, to: min(max(headline.used, 0), 1))
@@ -126,7 +131,11 @@ private struct RingCell: View {
             Group {
                 switch usage {
                 case .ok:
-                    Text("\(Int(((usage.headline?.used ?? 0) * 100).rounded()))%")
+                    if let amount = usage.headline?.amount {
+                        Text(amount).lineLimit(1).minimumScaleFactor(0.6)
+                    } else {
+                        Text("\(Int(((usage.headline?.used ?? 0) * 100).rounded()))%")
+                    }
                 case .loading:
                     Text("–")
                 case .problem, .notSetUp:
