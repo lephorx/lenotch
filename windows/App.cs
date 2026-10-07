@@ -123,7 +123,7 @@ public sealed class App : Application
             while (true)
             {
                 signal.WaitOne();
-                Dispatcher.BeginInvoke(ShowSettings);
+                Dispatcher.BeginInvoke(() => ShowSettings());
             }
         }) { IsBackground = true, Name = "Lenotch second launch" };
         thread.Start();

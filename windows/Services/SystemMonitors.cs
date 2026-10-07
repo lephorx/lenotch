@@ -40,7 +40,9 @@ public sealed class BatteryMonitor
         var timer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(20) };
         timer.Tick += (_, _) => Read();
         timer.Start();
-        SystemEvents.PowerModeChanged += (_, _) => Dispatcher.CurrentDispatcher.BeginInvoke(Read);
+        // PowerModeChanged arrives on SystemEvents' own thread.
+        var dispatcher = Dispatcher.CurrentDispatcher;
+        SystemEvents.PowerModeChanged += (_, _) => dispatcher.BeginInvoke(() => Read());
         Read();
     }
 

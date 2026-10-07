@@ -73,8 +73,8 @@ public sealed class MediaService
         {
             return;
         }
-        manager.SessionsChanged += (_, _) => dispatcher.BeginInvoke(PickSession);
-        manager.CurrentSessionChanged += (_, _) => dispatcher.BeginInvoke(PickSession);
+        manager.SessionsChanged += (_, _) => dispatcher.BeginInvoke(() => PickSession());
+        manager.CurrentSessionChanged += (_, _) => dispatcher.BeginInvoke(() => PickSession());
         PickSession();
         poll.Start();
     }
@@ -143,7 +143,7 @@ public sealed class MediaService
     }
 
     private void OnMediaProperties(GlobalSystemMediaTransportControlsSession sender, MediaPropertiesChangedEventArgs args) =>
-        dispatcher.BeginInvoke(Refresh);
+        dispatcher.BeginInvoke(() => Refresh());
 
     private void OnPlaybackInfo(GlobalSystemMediaTransportControlsSession sender, PlaybackInfoChangedEventArgs args) =>
         dispatcher.BeginInvoke(() =>
@@ -153,7 +153,7 @@ public sealed class MediaService
         });
 
     private void OnTimeline(GlobalSystemMediaTransportControlsSession sender, TimelinePropertiesChangedEventArgs args) =>
-        dispatcher.BeginInvoke(Refresh);
+        dispatcher.BeginInvoke(() => Refresh());
 
     private bool refreshing;
 

@@ -132,7 +132,7 @@ public sealed class NotchWindow : Window
             HwndSource.FromHwnd(hwnd)?.AddHook(WndProc);
             Place();
         };
-        DpiChanged += (_, _) => Dispatcher.BeginInvoke(Place);
+        DpiChanged += (_, _) => Dispatcher.BeginInvoke(() => Place());
         Loaded += (_, _) => poll.Start();
         Closed += (_, _) =>
         {
