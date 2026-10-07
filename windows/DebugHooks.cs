@@ -117,7 +117,8 @@ public sealed class DebugHooks
             var bounds = new Rect(0, 0, element.ActualWidth, element.ActualHeight);
             context.PushTransform(new ScaleTransform(scale, scale));
             context.DrawRectangle(black ? Brushes.Black : new SolidColorBrush(Color.FromRgb(120, 128, 140)), null, bounds);
-            context.DrawRectangle(new VisualBrush(element) { Stretch = Stretch.None, AlignmentX = AlignmentX.Left, AlignmentY = AlignmentY.Top }, null, bounds);
+            // Framed to the element's own bounds, not its content's (which would push narrow notches left).
+            context.DrawRectangle(new VisualBrush(element) { Viewbox = bounds, ViewboxUnits = BrushMappingMode.Absolute, Stretch = Stretch.Fill }, null, bounds);
             context.Pop();
         }
         var bitmap = new RenderTargetBitmap(width, height, 96, 96, PixelFormats.Pbgra32);
