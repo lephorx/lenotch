@@ -6,7 +6,8 @@ Add one in **Settings → AI Usage → Add Custom Provider…**, or describe it 
 ## Where configs live
 
 ```
-~/Library/Application Support/Lenotch/Providers/*.json
+~/Library/Application Support/Lenotch/Providers/*.json   (macOS)
+%APPDATA%\Lenotch\Providers\*.json                      (Windows)
 ```
 
 Every `.json` file in that folder becomes a provider. Use **Import Config…** to copy one in,

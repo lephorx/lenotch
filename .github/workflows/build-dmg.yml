@@ -1,4 +1,4 @@
-name: Build and release DMG
+name: Build and release
 
 on:
   push:
@@ -100,3 +100,106 @@ jobs:
             build/Lenotch.dmg.sha256
             build/appcast.xml
           body_path: build/release-notes.md
+
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: "10.0.x"
+
+      # One self-contained Lenotch.exe (no .NET install needed). Version tags like
+      # v2.10 set the exe's version, which the in-app updater compares against.
+      - name: Build Lenotch.exe
+        shell: bash
+        run: |
+          VERSION_ARGS=()
+          if [[ "$GITHUB_REF" == refs/tags/v* ]]; then
+            VERSION_ARGS+=("-p:Version=${GITHUB_REF_NAME#v}")
+          fi
+          dotnet publish windows/Lenotch.csproj -c Release -r win-x64 "${VERSION_ARGS[@]}" -o dist
+          ls -la dist
+
+      # Starts the exe, drives it through its debug hooks and renders the notch's
+      # states to PNGs, so a startup crash or broken layout shows up here.
+      - name: Smoke test
+        shell: pwsh
+        run: |
+          $dir = Join-Path $env:RUNNER_TEMP "lenotch"
+          New-Item -ItemType Directory -Force -Path $dir | Out-Null
+          $env:LENOTCH_DEBUG_DIR = $dir
+          $cmd = Join-Path $dir "lenotch-cmd.txt"
+          $app = Start-Process -FilePath "dist\Lenotch.exe" -PassThru
+          function Send($text) { Set-Content -Path $cmd -Value $text; Start-Sleep -Seconds 2 }
+          Start-Sleep -Seconds 10
+          Send "snap closed"
+          Send "hold"
+          Send "snap player"
+          Send "page 1"
+          Send "snap shelf"
+          Send "ai on"
+          Send "page 2"
+          Send "snap ai"
+          Send "page 0"
+          Send "timerpanel"
+          Send "snap timerpanel"
+          Send "release"
+          Send "close"
+          Send "timer 30"
+          Send "snap timer"
+          Send "settings general"
+          Send "snap general"
+          Send "settings aiusage"
+          Send "snap aisettings"
+          Start-Sleep -Seconds 1
+          Get-Content (Join-Path $dir "lenotch-debug.txt") -ErrorAction SilentlyContinue
+          $log = Join-Path $env:APPDATA "Lenotch\lenotch.log"
+          if (Test-Path $log) { Get-Content $log; Copy-Item $log $dir }
+          if ($app.HasExited) { Write-Error "Lenotch.exe exited (code $($app.ExitCode))"; exit 1 }
+          Stop-Process -Id $app.Id
+          if (Select-String -Path $log -Pattern "Unhandled|Fatal" -Quiet -ErrorAction SilentlyContinue) {
+            Write-Error "Lenotch logged an unhandled exception"; exit 1
+          }
+          Get-ChildItem $dir
+
+      - uses: actions/upload-artifact@v6
+        if: always()
+        with:
+          name: Lenotch-smoke-test
+          path: ${{ runner.temp }}/lenotch
+
+      - name: Checksum
+        shell: pwsh
+        run: |
+          $hash = (Get-FileHash dist\Lenotch.exe -Algorithm SHA256).Hash.ToLower()
+          "$hash  Lenotch.exe" | Out-File -Encoding ascii dist\Lenotch.exe.sha256
+
+      - uses: actions/upload-artifact@v6
+        with:
+          name: Lenotch-Windows
+          path: |
+            dist/Lenotch.exe
+            dist/Lenotch.exe.sha256
+          if-no-files-found: error
+
+  # Every release gets a direct Lenotch.exe download next to the DMG.
+  release-windows:
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: [dmg, windows]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v7
+        with:
+          name: Lenotch-Windows
+          path: dist
+
+      - name: Attach Lenotch.exe to the release
+        uses: softprops/action-gh-release@v3
+        with:
+          files: |
+            dist/Lenotch.exe
+            dist/Lenotch.exe.sha256

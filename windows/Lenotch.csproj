@@ -1,0 +1,45 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net10.0-windows10.0.19041.0</TargetFramework>
+    <SupportedOSPlatformVersion>10.0.19041.0</SupportedOSPlatformVersion>
+    <!-- Lets the project build on macOS and Linux too (CI and local checks). -->
+    <EnableWindowsTargeting>true</EnableWindowsTargeting>
+    <UseWPF>true</UseWPF>
+    <UseWindowsForms>true</UseWindowsForms>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <LangVersion>latest</LangVersion>
+    <!-- WPF owns DPI handling (app.manifest); WinForms is only used for the tray icon. -->
+    <NoWarn>$(NoWarn);WFO0003</NoWarn>
+    <RootNamespace>Lenotch</RootNamespace>
+    <AssemblyName>Lenotch</AssemblyName>
+    <ApplicationIcon>Assets\Lenotch.ico</ApplicationIcon>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+    <Version>2.9.2</Version>
+    <Product>Lenotch</Product>
+    <Company>lephorx</Company>
+    <Description>A black notch for Windows with Now Playing.</Description>
+    <Copyright>lephorx</Copyright>
+    <!-- One self-contained Lenotch.exe: nothing to install first. -->
+    <RuntimeIdentifier Condition="'$(RuntimeIdentifier)' == ''">win-x64</RuntimeIdentifier>
+    <SelfContained>true</SelfContained>
+    <PublishSingleFile>true</PublishSingleFile>
+    <IncludeNativeLibrariesForSelfExtract>true</IncludeNativeLibrariesForSelfExtract>
+    <EnableCompressionInSingleFile>true</EnableCompressionInSingleFile>
+    <DebugType>embedded</DebugType>
+    <SatelliteResourceLanguages>en</SatelliteResourceLanguages>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Resource Include="Assets\logo-white.png" />
+    <Resource Include="Assets\Lenotch.ico" />
+    <Resource Include="Assets\Tray.ico" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="NAudio.Wasapi" Version="2.2.1" />
+  </ItemGroup>
+
+</Project>

@@ -25,6 +25,30 @@ A black SwiftUI notch for MacBooks with a Now Playing live activity.
 
 Custom AI usage providers (with their own logos) can be added in Settings or as config files: see [docs/provider-config.md](docs/provider-config.md).
 
+## Windows
+
+Lenotch also runs on Windows 10 (2004+) and 11 as a single `Lenotch.exe`: download it from the
+[latest release](https://github.com/lephorx/lenotch/releases/latest) and run it, nothing to install.
+On Windows the notch is the black style only, and it sits at the top centre of each screen.
+
+- **Now Playing** follows Windows' media sessions (Spotify, Apple Music, browsers, any app that shows
+  in the volume flyout), with artwork, seeking, shuffle and repeat, and a real audio visualizer.
+- **Calendar:** Windows doesn't share its calendars with apps, so add your calendars' iCal links
+  (Outlook, Google, iCloud) in Settings → Calendar.
+- **Shelf** with drag in and out; **Share** (Nearby Sharing, Mail, …) takes AirDrop's place.
+- Weather, timer, AI usage, crypto, network speed, battery, and the mic/camera outline work as on macOS.
+- The notch hides while a game or video is full screen. Shortcuts default to Alt+Shift+N (open) and
+  Alt+Shift+P (current song). Settings are in the tray icon's menu.
+- Lenotch checks the latest GitHub release for a newer `Lenotch.exe` and updates itself.
+
+Build it on any OS with the .NET 10 SDK (the source is in [`windows/`](windows)):
+
+```bash
+dotnet publish windows/Lenotch.csproj -c Release -r win-x64 -o dist   # dist/Lenotch.exe
+```
+
+Windows SmartScreen may warn about the unsigned exe on first launch: choose **More info → Run anyway**.
+
 ## Build & run
 
 Requires macOS 14+ and Xcode / Swift 6 toolchain. Building the installer DMG also
@@ -48,9 +72,10 @@ settings. Sparkle asks about background checks on the second launch.
 ## Releases
 
 GitHub Actions ([build-dmg.yml](.github/workflows/build-dmg.yml)) builds a universal
-`Lenotch.dmg` on pushes to `main`, `dev` or `lenotch-rewrite`, and on pull requests
-(download it from the run's artifacts). Pushing a version tag publishes the DMG,
-its SHA-256 checksum, and a signed `appcast.xml` as a GitHub Release; the app's
+`Lenotch.dmg` and the Windows `Lenotch.exe` on pushes to `main`, `dev` or `lenotch-rewrite`,
+and on pull requests (download them from the run's artifacts). The Windows job also starts the
+exe and renders the notch's states to PNGs (the `Lenotch-smoke-test` artifact). Pushing a version
+tag publishes the DMG, its SHA-256 checksum, a signed `appcast.xml` and `Lenotch.exe` as a GitHub Release; the app's
 update feed is `releases/latest/download/appcast.xml`, so every release is picked
 up automatically. Release builds require the `SPARKLE_PRIVATE_KEY` Actions secret
 containing the private key for the public key in `Resources/Info.plist`. The

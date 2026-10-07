@@ -23,6 +23,10 @@ Carthage/Build/
 .swiftpm/
 .build/
 
+# .NET (Windows app)
+windows/bin/
+windows/obj/
+
 # Derived data
 DerivedData/
 
