@@ -188,7 +188,7 @@ public sealed class AppSettings
     public bool ShowPrivacyIndicator { get => showPrivacyIndicator; set => Set(ref showPrivacyIndicator, value); }
     private bool privacyGlow;
     public bool PrivacyGlow { get => privacyGlow; set => Set(ref privacyGlow, value); }
-    private bool showNetworkSpeed = true;
+    private bool showNetworkSpeed;
     public bool ShowNetworkSpeed { get => showNetworkSpeed; set => Set(ref showNetworkSpeed, value); }
     private bool showCrypto;
     public bool ShowCrypto { get => showCrypto; set => Set(ref showCrypto, value); }

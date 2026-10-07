@@ -225,7 +225,7 @@ final class AppSettings {
         showPrivacyIndicator = bool("showPrivacyIndicator", true)
         privacyGlow = bool("privacyGlow", false)
         showCrypto = bool("showCrypto", false)
-        showNetworkSpeed = bool("showNetworkSpeed", true)
+        showNetworkSpeed = bool("showNetworkSpeed", false)
         showTimer = bool("showTimer", false)
         timerSilent = bool("timerSilent", false)
         cryptoCoins = defaults.stringArray(forKey: "cryptoCoins") ?? ["bitcoin", "ethereum"]
