@@ -222,7 +222,7 @@ public sealed class SettingsWindow : Window
             Toggle("Show the icon in the notification area", "When hidden, open Settings from the notch's gear or by starting Lenotch again.",
                 () => Settings.ShowTrayIcon, v => Settings.ShowTrayIcon = v));
         yield return Group("Startup & updates",
-            Toggle("Launch at login", null, () => LaunchAtLogin.IsEnabled, v => LaunchAtLogin.IsEnabled = v),
+            Toggle("Start with Windows", "Lenotch starts when you sign in.", () => LaunchAtLogin.IsEnabled, v => LaunchAtLogin.IsEnabled = v),
             Toggle("Check for updates automatically", null, () => Settings.CheckForUpdates, v => Settings.CheckForUpdates = v));
         yield return Group("Help",
             ButtonRow("Replay the intro", null, "Play", playIntro));

@@ -335,23 +335,40 @@ public sealed class NotchTimer
     }
 }
 
-/// Launch at login, through the current user's Run key.
+/// Start with Windows, through the current user's Run key (no admin rights or installer).
 public static class LaunchAtLogin
 {
     private const string RunKey = @"Software\Microsoft\Windows\CurrentVersion\Run";
+    /// Where Task Manager's Startup apps page records entries the user switched off.
+    private const string ApprovedKey = @"Software\Microsoft\Windows\CurrentVersion\Explorer\StartupApproved\Run";
 
     public static bool IsEnabled
     {
         get
         {
             using var key = Registry.CurrentUser.OpenSubKey(RunKey);
-            return key?.GetValue("Lenotch") is string;
+            if (key?.GetValue("Lenotch") is not string) return false;
+            // An odd first byte means it was disabled in Task Manager.
+            using var approved = Registry.CurrentUser.OpenSubKey(ApprovedKey);
+            return approved?.GetValue("Lenotch") is not byte[] { Length: > 0 } state || state[0] % 2 == 0;
         }
         set
         {
-            using var key = Registry.CurrentUser.CreateSubKey(RunKey);
-            if (value && Environment.ProcessPath is { } path) key.SetValue("Lenotch", $"\"{path}\"");
-            else key.DeleteValue("Lenotch", false);
+            try
+            {
+                using (var key = Registry.CurrentUser.CreateSubKey(RunKey))
+                {
+                    if (value && Environment.ProcessPath is { } path) key.SetValue("Lenotch", $"\"{path}\"");
+                    else key.DeleteValue("Lenotch", false);
+                }
+                // Turning it on here also lifts a block set in Task Manager.
+                using var approved = Registry.CurrentUser.OpenSubKey(ApprovedKey, writable: true);
+                approved?.DeleteValue("Lenotch", false);
+            }
+            catch (Exception error)
+            {
+                App.Log($"Couldn't change Start with Windows: {error.Message}");
+            }
         }
     }
 

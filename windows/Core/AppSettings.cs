@@ -89,6 +89,9 @@ public sealed class AppSettings
     // MARK: Setup
     private bool hasPlayedIntro;
     public bool HasPlayedIntro { get => hasPlayedIntro; set => Set(ref hasPlayedIntro, value); }
+    /// The first-launch question about starting with Windows was answered.
+    private bool askedAboutStartup;
+    public bool AskedAboutStartup { get => askedAboutStartup; set => Set(ref askedAboutStartup, value); }
     private string? lastSeenVersion;
     public string? LastSeenVersion { get => lastSeenVersion; set => Set(ref lastSeenVersion, value); }
 
