@@ -32,6 +32,7 @@ public sealed class AIUsageView : NotchContentView
     private readonly DispatcherTimer poll = new() { Interval = TimeSpan.FromSeconds(120) };
     private string key = "";
     private bool first = true;
+    private bool refreshing;
 
     public AIUsageView(NotchModel model)
     {
@@ -47,6 +48,18 @@ public sealed class AIUsageView : NotchContentView
         {
             poll.Stop();
             model.SetUsageHover(null);
+        };
+        // Right-click fetches fresh readings (dimmed while they load).
+        Background = Brushes.Transparent;
+        MouseRightButtonUp += async (_, e) =>
+        {
+            e.Handled = true;
+            if (refreshing) return;
+            refreshing = true;
+            this.Animate(OpacityProperty, 0.45, 0.2);
+            await model.Services.AIUsage.Refresh(model.Settings.UsageSources, force: true);
+            this.Animate(OpacityProperty, 1, 0.2);
+            refreshing = false;
         };
         Refresh();
     }

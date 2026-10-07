@@ -154,6 +154,15 @@ final class NotchWindowController {
         }) {
             monitors.append(scroll)
         }
+        // Right-clicking the AI Usage tab fetches fresh readings.
+        if let rightClick = NSEvent.addLocalMonitorForEvents(matching: .rightMouseDown, handler: { [weak self] event in
+            guard let self, event.window === self.panel, self.model.state == .open,
+                  self.model.visiblePage == .aiUsage, !self.model.isTimerPanelVisible else { return event }
+            self.model.refreshUsage()
+            return nil
+        }) {
+            monitors.append(rightClick)
+        }
     }
 
     // MARK: - Swipe between tabs

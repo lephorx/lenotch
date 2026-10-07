@@ -44,6 +44,9 @@ struct AIUsageView: View {
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
         }
+        // Dimmed while a right-click refresh runs.
+        .opacity(model.isRefreshingUsage ? 0.45 : 1)
+        .animation(.easeInOut(duration: 0.2), value: model.isRefreshingUsage)
         .onDisappear { model.setUsageHover(nil) }
         // Poll only while the widget is on screen.
         .task(id: sources.map(\.id)) {
