@@ -185,6 +185,18 @@ final class NotchViewModel {
         }
     }
 
+    /// A forced reload of every usage ring is running (right-click on the AI Usage tab).
+    private(set) var isRefreshingUsage = false
+
+    func refreshUsage() {
+        guard !isRefreshingUsage else { return }
+        isRefreshingUsage = true
+        Task { @MainActor in
+            await aiUsage.refresh(settings.usageSources, force: true)
+            isRefreshingUsage = false
+        }
+    }
+
     /// AI usage sources with something to show (tools that aren't set up are hidden).
     var visibleUsageCount: Int {
         settings.usageSources.filter { aiUsage.usage[$0.id] != .notSetUp }.count
