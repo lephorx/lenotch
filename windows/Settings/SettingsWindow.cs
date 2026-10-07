@@ -230,9 +230,17 @@ public sealed class SettingsWindow : Window
     private IEnumerable<UIElement> Look()
     {
         yield return Note("On Windows the notch is solid black, like the hardware notch.");
+        // Off removes the whole battery (icon and percentage) from the notch header.
+        var percentage = Toggle("Show battery percentage", null, () => Settings.ShowBatteryPercentage, v => Settings.ShowBatteryPercentage = v);
+        percentage.IsEnabled = Settings.ShowBatteryIndicator;
+        percentage.Opacity = Settings.ShowBatteryIndicator ? 1 : 0.45;
         yield return Group("Notch header",
-            Toggle("Show battery indicator", "Only on PCs with a battery.", () => Settings.ShowBatteryIndicator, v => Settings.ShowBatteryIndicator = v),
-            Toggle("Show battery percentage", null, () => Settings.ShowBatteryPercentage, v => Settings.ShowBatteryPercentage = v));
+            Toggle("Show battery indicator", "Only on PCs with a battery.", () => Settings.ShowBatteryIndicator, v =>
+            {
+                Settings.ShowBatteryIndicator = v;
+                ShowPage();
+            }),
+            percentage);
         yield return Group("Follow the album colour",
             Toggle("Notch background", "A soft glow of the cover's colour in the open notch.", () => Settings.BackgroundFollowsMusic, v => Settings.BackgroundFollowsMusic = v),
             Toggle("Equalizer bars", null, () => Settings.TintEqualizer, v => Settings.TintEqualizer = v),
