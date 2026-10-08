@@ -34,7 +34,7 @@ enum AIProvider: String, Codable, CaseIterable, Identifiable {
         case .kimi: "~/.kimi-code (Kimi Code CLI)"
         case .opencode: "~/.local/share/opencode/auth.json"
         case .amp: "~/.local/share/amp/secrets.json"
-        case .deepseek: "API key (add it here) or DEEPSEEK_API_KEY"
+        case .deepseek: "Sign in or API key (add it here), or DEEPSEEK_API_KEY"
         }
     }
 

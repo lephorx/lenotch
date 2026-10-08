@@ -538,12 +538,16 @@ internal static class AmpUsage
 
 // MARK: - DeepSeek
 
-/// DeepSeek has no local sign-in to read, so its API key is entered in Settings
-/// (encrypted for this Windows user) or taken from DEEPSEEK_API_KEY. The API
-/// reports a balance, not a limit.
+/// DeepSeek has no local sign-in to read. Either the user signs in to the DeepSeek
+/// Platform in Lenotch's own window (the session token is kept encrypted for this
+/// Windows user), which shows the whole account the way platform.deepseek.com does,
+/// or enters an API key (also encrypted, or taken from DEEPSEEK_API_KEY), which only
+/// reports the balance.
 public static class DeepSeekUsage
 {
+    public const string Platform = "https://platform.deepseek.com/";
     private static string KeyFile => Path.Combine(Core.AppSettings.Folder, "Keys", "deepseek.bin");
+    private static string SessionFile => Path.Combine(Core.AppSettings.Folder, "Keys", "deepseek-session.bin");
 
     /// Whether a key is saved in Lenotch (not counting the environment variable).
     public static bool HasSavedKey => File.Exists(KeyFile);
@@ -552,27 +556,42 @@ public static class DeepSeekUsage
     {
         get
         {
-            try
-            {
-                if (File.Exists(KeyFile))
-                    return Encoding.UTF8.GetString(System.Security.Cryptography.ProtectedData.Unprotect(
-                        File.ReadAllBytes(KeyFile), null, System.Security.Cryptography.DataProtectionScope.CurrentUser));
-            }
-            catch (Exception) { }
+            if (ReadSecret(KeyFile) is { } key) return key;
             var env = Environment.GetEnvironmentVariable("DEEPSEEK_API_KEY");
             return string.IsNullOrWhiteSpace(env) ? null : env.Trim();
         }
     }
 
     /// Saves the key; an empty one removes it.
-    public static void SaveApiKey(string key)
+    public static void SaveApiKey(string key) => WriteSecret(KeyFile, key);
+
+    /// The DeepSeek Platform session from signing in to the account in Lenotch.
+    public static string? SessionToken => ReadSecret(SessionFile);
+    public static bool IsSignedIn => File.Exists(SessionFile);
+
+    /// Saves the session from the sign-in window; an empty one signs out.
+    public static void SaveSessionToken(string token) => WriteSecret(SessionFile, token);
+
+    private static string? ReadSecret(string file)
     {
         try
         {
-            var trimmed = key.Trim();
-            if (trimmed.Length == 0) { File.Delete(KeyFile); return; }
-            Directory.CreateDirectory(Path.GetDirectoryName(KeyFile)!);
-            File.WriteAllBytes(KeyFile, System.Security.Cryptography.ProtectedData.Protect(
+            if (File.Exists(file))
+                return Encoding.UTF8.GetString(System.Security.Cryptography.ProtectedData.Unprotect(
+                    File.ReadAllBytes(file), null, System.Security.Cryptography.DataProtectionScope.CurrentUser));
+        }
+        catch (Exception) { }
+        return null;
+    }
+
+    private static void WriteSecret(string file, string value)
+    {
+        try
+        {
+            var trimmed = value.Trim();
+            if (trimmed.Length == 0) { File.Delete(file); return; }
+            Directory.CreateDirectory(Path.GetDirectoryName(file)!);
+            File.WriteAllBytes(file, System.Security.Cryptography.ProtectedData.Protect(
                 Encoding.UTF8.GetBytes(trimmed), null, System.Security.Cryptography.DataProtectionScope.CurrentUser));
         }
         catch (Exception) { }
@@ -580,6 +599,7 @@ public static class DeepSeekUsage
 
     public static async Task<ProviderUsage> Fetch()
     {
+        if (SessionToken is { } token) return await FetchAccount(token);
         if (ApiKey is not { } key) throw UsageException.NotSetUp;
         string text;
         try
@@ -611,8 +631,103 @@ public static class DeepSeekUsage
         });
     }
 
+    /// Reads the endpoints platform.deepseek.com's own usage page uses (as codenotch
+    /// does): the account summary (wallets and total spend) and the last 30 days of
+    /// tokens, requests and cost per API key and model.
+    public static async Task<ProviderUsage> FetchAccount(string token)
+    {
+        var today = DateTime.Today;
+        long Seconds(DateTime day) => new DateTimeOffset(day).ToUnixTimeSeconds();
+        var tz = (int)TimeZoneInfo.Local.GetUtcOffset(DateTime.Now).TotalSeconds;
+        var query = $"start={Seconds(today.AddDays(-29))}&end={Seconds(today.AddDays(1))}&tz={tz}";
+        var summaryTask = PlatformData("api/v0/users/get_user_summary", token);
+        var amountTask = PlatformData($"api/v0/usage/by_api_key/amount?{query}", token);
+        var costTask = PlatformData($"api/v0/usage/by_api_key/cost?{query}", token);
+        await Task.WhenAll(summaryTask, amountTask, costTask);
+        var (summary, amount, cost) = (summaryTask.Result, amountTask.Result, costTask.Result);
+
+        // One wallet per currency; the one actually funded or used is the account's.
+        var costs = Items(summary.Get("total_costs"));
+        var wallets = Items(summary.Get("normal_wallets"))
+            .Select(w => (Currency: w.Get("currency").AsString(), Balance: w.Get("balance").AsNumber()))
+            .Where(w => w.Currency != null && w.Balance != null)
+            .Select(w => (Currency: w.Currency!, Balance: w.Balance!.Value,
+                          Spent: costs.FirstOrDefault(c => c.Get("currency").AsString() == w.Currency)
+                              is { ValueKind: JsonValueKind.Object } c ? c.Get("amount").AsNumber() ?? 0 : 0))
+            .ToList();
+        if (wallets.Count == 0) throw UsageException.Problem("Unexpected response");
+        var wallet = wallets.MaxBy(w => w.Balance + w.Spent);
+
+        // Last 30 days: tokens and requests from `amount`, cost from `cost`.
+        double tokens = 0, requests = 0;
+        foreach (var series in Items(amount.Get("series")))
+            foreach (var bucket in Items(series.Get("buckets")))
+            {
+                var usage = bucket.Get("usage");
+                if (usage is not { ValueKind: JsonValueKind.Object } values) continue;
+                foreach (var name in new[] { "PROMPT_CACHE_HIT_TOKEN", "PROMPT_CACHE_MISS_TOKEN", "RESPONSE_TOKEN" })
+                    tokens += values.Get(name).AsNumber() ?? 0;
+                requests += values.Get("REQUEST").AsNumber() ?? 0;
+            }
+        var currencies = Items(cost.Get("data"));
+        var spending = currencies.FirstOrDefault(c => c.Get("currency").AsString() == wallet.Currency);
+        if (spending.ValueKind != JsonValueKind.Object && currencies.Count > 0) spending = currencies[0];
+        double spent = 0;
+        if (spending.ValueKind == JsonValueKind.Object)
+            foreach (var series in Items(spending.Get("series")))
+                foreach (var bucket in Items(series.Get("buckets")))
+                    spent += bucket.Get("cost").AsNumber() ?? 0;
+        var spendingCurrency = spending.ValueKind == JsonValueKind.Object ? spending.Get("currency").AsString() : null;
+
+        return new ProviderUsage.Ok(null, new List<UsageWindow>
+        {
+            new("balance", "Balance", wallet.Balance > 0 ? 0 : 1, null, Format(wallet.Balance, wallet.Currency),
+                $"{Format(wallet.Spent, wallet.Currency)} spent in total"),
+            new("month", "Last 30 days", 0, null, Format(spent, spendingCurrency ?? wallet.Currency),
+                $"{Compact(tokens)} tokens · {Compact(requests)} requests"),
+        });
+    }
+
+    private static List<JsonElement> Items(JsonElement? element) =>
+        element is { ValueKind: JsonValueKind.Array } array ? array.EnumerateArray().ToList() : new List<JsonElement>();
+
+    /// One Platform call; returns its `data.biz_data`. The Platform answers HTTP 200
+    /// even when the session has ended, with an error `code` in the body.
+    private static async Task<JsonElement> PlatformData(string path, string token)
+    {
+        string text;
+        try
+        {
+            text = await UsageHttp.Get(Platform + path, new()
+            {
+                ["Authorization"] = $"Bearer {token}",
+                ["Accept"] = "application/json",
+                ["x-client-platform"] = "web",
+            });
+        }
+        catch (UsageException error) when (error.Message == "Sign in again")
+        {
+            throw UsageException.Problem("Sign in to DeepSeek again");
+        }
+        var root = UsageHttp.ParseJson(text);
+        if (root.Get("code").AsNumber() is { } code && code != 0)
+            throw UsageException.Problem(code is >= 40000 and < 41000 ? "Sign in to DeepSeek again" : "Usage unavailable right now");
+        if (root.At("data.biz_data") is not { ValueKind: JsonValueKind.Object } biz)
+            throw UsageException.Problem("Unexpected response");
+        return biz;
+    }
+
     public static string Format(double value, string currency) =>
         (currency switch { "USD" => "$", "CNY" => "¥", _ => currency + " " }) + value.ToString("0.00", CultureInfo.InvariantCulture);
+
+    /// 1234 → "1.2K", 3400000 → "3.4M".
+    public static string Compact(double value) => value switch
+    {
+        >= 1e9 => (value / 1e9).ToString("0.0", CultureInfo.InvariantCulture) + "B",
+        >= 1e6 => (value / 1e6).ToString("0.0", CultureInfo.InvariantCulture) + "M",
+        >= 1e3 => (value / 1e3).ToString("0.0", CultureInfo.InvariantCulture) + "K",
+        _ => ((long)value).ToString(CultureInfo.InvariantCulture),
+    };
 }
 
 // MARK: - Custom
