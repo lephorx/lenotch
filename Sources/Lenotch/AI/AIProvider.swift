@@ -48,7 +48,7 @@ enum AIProvider: String, Codable, CaseIterable, Identifiable {
         case .kimi: .outline(GlyphOutline.kimi)
         case .opencode: .outline(GlyphOutline.opencode)
         case .amp: .image("glyph-amp")
-        case .deepseek: .outline(GlyphOutline.deepseek)
+        case .deepseek: .image("glyph-deepseek")
         }
     }
 }

@@ -28,7 +28,7 @@ cp "$BIN_DIR/Lenotch" "$APP/Contents/MacOS/"
 install_name_tool -add_rpath @executable_path/../Frameworks "$APP/Contents/MacOS/Lenotch"
 cp Resources/Info.plist "$APP/Contents/"
 cp -R Vendor/MediaRemoteAdapter "$APP/Contents/Resources/"
-cp Resources/logo-white.png Resources/AppIcon.icns Resources/glyph-amp.svg "$APP/Contents/Resources/"
+cp Resources/logo-white.png Resources/AppIcon.icns Resources/glyph-amp.svg Resources/glyph-deepseek.svg "$APP/Contents/Resources/"
 if [ "${1:-}" = dmg ]; then
   cp Resources/installer-background.png "$APP/Contents/Resources/"
 fi

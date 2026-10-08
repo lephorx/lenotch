@@ -287,6 +287,9 @@ private struct GeneralSettings: View {
                     get: { updater.automaticallyChecksForUpdates },
                     set: { updater.automaticallyChecksForUpdates = $0 }
                 ))
+                LabeledContent("Check for updates") {
+                    Button("Check Now…") { updater.checkForUpdates() }
+                }
             }
             Section("Help") {
                 LabeledContent("Version") {
