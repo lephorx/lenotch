@@ -351,22 +351,62 @@ private struct CustomProviderEditor: View {
     }
 }
 
-/// Sheet for DeepSeek's API key, kept in the keychain.
+/// Sheet for DeepSeek: sign in to the account (shows balance, spend and the last 30 days),
+/// or an API key (balance only). Both are kept in the keychain.
 private struct DeepSeekKeyEditor: View {
     let done: () -> Void
     @State private var key = ""
     @State private var result: String?
     @State private var testing = false
+    @State private var signedIn = DeepSeekUsage.isSignedIn
+    @State private var signingIn = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text("DeepSeek API Key").font(.system(size: 15, weight: .semibold))
-            Text("Create one at platform.deepseek.com → API keys. Lenotch keeps it in your keychain and only uses it to read your balance.")
+            Text("DeepSeek").font(.system(size: 15, weight: .semibold))
+
+            Text("Account").font(.system(size: 12, weight: .semibold))
+            Text("Sign in to the DeepSeek Platform to see your balance, total spend, and the last 30 days of tokens, requests and cost. Lenotch keeps the session in your keychain.")
+                .font(.system(size: 11))
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+            HStack {
+                if signedIn {
+                    Label("Signed in", systemImage: "checkmark.circle.fill")
+                        .font(.system(size: 12))
+                        .foregroundStyle(.green)
+                    Spacer()
+                    Button("Sign Out") {
+                        DeepSeekUsage.saveSessionToken("")
+                        signedIn = false
+                        result = nil
+                    }
+                } else {
+                    Button(signingIn ? "Waiting for sign-in…" : "Sign in to DeepSeek…") {
+                        signingIn = true
+                        DeepSeekSignIn.shared.present { success in
+                            signingIn = false
+                            signedIn = DeepSeekUsage.isSignedIn
+                            if success { result = nil }
+                        }
+                    }
+                    .disabled(signingIn)
+                    Spacer()
+                }
+            }
+
+            Divider()
+
+            Text("API Key").font(.system(size: 12, weight: .semibold))
+            Text(signedIn
+                 ? "Not needed while you're signed in."
+                 : "Or create one at platform.deepseek.com → API keys. With a key Lenotch can only read your balance.")
                 .font(.system(size: 11))
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
             SecureField(DeepSeekUsage.hasSavedKey ? "Saved (type to replace)" : "sk-…", text: $key)
                 .textFieldStyle(.roundedBorder)
+                .disabled(signedIn)
             if let result {
                 Text(result).font(.system(size: 11)).foregroundStyle(.secondary)
             }
@@ -379,7 +419,7 @@ private struct DeepSeekKeyEditor: View {
                 }
                 Spacer()
                 Button("Test") { Task { await test() } }
-                    .disabled(testing || (key.isEmpty && DeepSeekUsage.apiKey == nil))
+                    .disabled(testing || (key.isEmpty && DeepSeekUsage.apiKey == nil && !signedIn))
                 Button("Cancel", action: done)
                 Button("Save") {
                     if !key.isEmpty { DeepSeekUsage.saveAPIKey(key) }
@@ -389,7 +429,7 @@ private struct DeepSeekKeyEditor: View {
             }
         }
         .padding(20)
-        .frame(width: 420)
+        .frame(width: 440)
     }
 
     private func test() async {
@@ -405,7 +445,7 @@ private struct DeepSeekKeyEditor: View {
         } catch UsageError.problem(let message) {
             result = message
         } catch UsageError.notSetUp {
-            result = "Enter a key first."
+            result = "Sign in or enter a key first."
         } catch {
             result = "Couldn't reach DeepSeek."
         }

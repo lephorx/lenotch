@@ -461,7 +461,8 @@ public sealed class SettingsWindow : Window
         var rows = new List<UIElement>();
         foreach (var provider in builtIn)
         {
-            var detail = provider == AIProvider.DeepSeek && DeepSeekUsage.HasSavedKey ? "API key saved" : provider.Source();
+            var detail = provider != AIProvider.DeepSeek ? provider.Source()
+                : DeepSeekUsage.IsSignedIn ? "Signed in" : DeepSeekUsage.HasSavedKey ? "API key saved" : provider.Source();
             rows.Add(SourceRow(new UsageSource(provider), detail, null));
             if (provider == AIProvider.DeepSeek && editingDeepSeek) rows.Add(DeepSeekKeyEditor());
         }
@@ -521,7 +522,7 @@ public sealed class SettingsWindow : Window
         }
         if (source.BuiltIn == AIProvider.DeepSeek)
         {
-            controls.Children.Add(SmallButton("API key…", () =>
+            controls.Children.Add(SmallButton("Set up…", () =>
             {
                 editingDeepSeek = !editingDeepSeek;
                 testResult = "";
@@ -589,13 +590,39 @@ public sealed class SettingsWindow : Window
         ShowPage();
     }
 
-    /// DeepSeek's API key, encrypted for this Windows user.
+    /// DeepSeek: sign in to the account (balance, spend and the last 30 days), or an
+    /// API key (balance only). Both are encrypted for this Windows user.
     private UIElement DeepSeekKeyEditor()
     {
         var form = new StackPanel { Margin = new Thickness(14, 4, 14, 14) };
-        var hint = Ui.Text("Create one at platform.deepseek.com → API keys. Lenotch only uses it to read your balance.",
+        var signedIn = DeepSeekUsage.IsSignedIn;
+        var accountHint = Ui.Text("Sign in to the DeepSeek Platform to see your balance, total spend, and the last 30 days of tokens, requests and cost.",
+            12, FontWeights.Normal, SecondaryBrush);
+        accountHint.TextWrapping = TextWrapping.Wrap;
+        form.Children.Add(accountHint);
+        form.Children.Add(Row("Account", signedIn ? "Signed in." : null, SmallButton(signedIn ? "Sign out" : "Sign in…", () =>
+        {
+            if (signedIn)
+            {
+                DeepSeekUsage.SaveSessionToken("");
+            }
+            else
+            {
+                var window = new DeepSeekSignIn { Owner = this };
+                window.ShowDialog();
+                if (!window.SignedIn) return;
+                if (!Settings.UsageSourceKeys.Contains(AIProvider.DeepSeek.Key()))
+                    Settings.UsageSourceKeys = Settings.UsageSourceKeys.Append(AIProvider.DeepSeek.Key()).ToList();
+            }
+            testResult = "";
+            _ = services.AIUsage.Refresh(Settings.UsageSources, force: true);
+            ShowPage();
+        })));
+        var hint = Ui.Text(signedIn ? "An API key isn't needed while you're signed in."
+                : "Or create a key at platform.deepseek.com → API keys. With a key Lenotch can only read your balance.",
             12, FontWeights.Normal, SecondaryBrush);
         hint.TextWrapping = TextWrapping.Wrap;
+        hint.Margin = new Thickness(0, 10, 0, 0);
         form.Children.Add(hint);
         var key = new PasswordBox { Style = (Style)Application.Current.Resources["LenotchPasswordBox"], MinWidth = 260 };
         form.Children.Add(Row("API key", DeepSeekUsage.HasSavedKey ? "Saved. Type to replace." : null, key, stretchControl: true));
@@ -622,7 +649,7 @@ public sealed class SettingsWindow : Window
             }
             catch (Exception error)
             {
-                testResult = error.Message is { Length: > 0 } message ? message : "Enter a key first.";
+                testResult = error.Message is { Length: > 0 } message ? message : "Sign in or enter a key first.";
             }
             result.Text = testResult;
         }, new Thickness(8, 0, 0, 0)));

@@ -49,7 +49,7 @@ public static class AIProviders
         AIProvider.Grok => @"%USERPROFILE%\.grok\auth.json (Grok CLI)",
         AIProvider.Kimi => @"%USERPROFILE%\.kimi-code (Kimi Code CLI)",
         AIProvider.Opencode => @"%USERPROFILE%\.local\share\opencode\auth.json",
-        AIProvider.DeepSeek => "API key (add it here) or DEEPSEEK_API_KEY",
+        AIProvider.DeepSeek => "Sign in or API key (add it here), or DEEPSEEK_API_KEY",
         _ => @"%USERPROFILE%\.local\share\amp\secrets.json",
     };
 

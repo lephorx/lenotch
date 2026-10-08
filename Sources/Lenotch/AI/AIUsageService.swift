@@ -518,37 +518,50 @@ enum AmpUsage {
 
 // MARK: - DeepSeek
 
-/// DeepSeek has no local sign-in to read, so its API key is entered in Settings (kept
-/// in the keychain) or taken from DEEPSEEK_API_KEY. The API reports a balance, not a limit.
+/// DeepSeek has no local sign-in to read. Either the user signs in to the DeepSeek Platform
+/// in Lenotch's own window (the session token is kept in the keychain), which shows the
+/// whole account the way platform.deepseek.com does, or enters an API key (also kept in
+/// the keychain, or taken from DEEPSEEK_API_KEY), which only reports the balance.
 enum DeepSeekUsage {
     private static let keychainService = "com.lephorx.Lenotch.deepseek"
+    private static let keyAccount = "api-key"
+    private static let sessionAccount = "platform-session"
+    static let platform = URL(string: "https://platform.deepseek.com/")!
 
     static var apiKey: String? {
-        let query: [CFString: Any] = [
-            kSecClass: kSecClassGenericPassword, kSecAttrService: keychainService,
-            kSecAttrAccount: "api-key", kSecReturnData: true, kSecMatchLimit: kSecMatchLimitOne,
-        ]
-        var result: AnyObject?
-        if SecItemCopyMatching(query as CFDictionary, &result) == errSecSuccess, let data = result as? Data,
-           let key = String(data: data, encoding: .utf8), !key.isEmpty {
-            return key
-        }
+        if let key = keychainValue(keyAccount) { return key }
         return ProcessInfo.processInfo.environment["DEEPSEEK_API_KEY"].flatMap { $0.isEmpty ? nil : $0 }
     }
 
     /// Whether a key is saved in Lenotch (not counting the environment variable).
-    static var hasSavedKey: Bool {
-        let query: [CFString: Any] = [kSecClass: kSecClassGenericPassword, kSecAttrService: keychainService,
-                                      kSecAttrAccount: "api-key"]
-        return SecItemCopyMatching(query as CFDictionary, nil) == errSecSuccess
-    }
+    static var hasSavedKey: Bool { keychainValue(keyAccount) != nil }
 
     /// Saves the key; an empty one removes it.
-    static func saveAPIKey(_ key: String) {
+    static func saveAPIKey(_ key: String) { setKeychainValue(key, for: keyAccount) }
+
+    /// The DeepSeek Platform session from signing in to the account in Lenotch.
+    static var sessionToken: String? { keychainValue(sessionAccount) }
+    static var isSignedIn: Bool { sessionToken != nil }
+
+    /// Saves the session from the sign-in window; an empty one signs out.
+    static func saveSessionToken(_ token: String) { setKeychainValue(token, for: sessionAccount) }
+
+    private static func keychainValue(_ account: String) -> String? {
+        let query: [CFString: Any] = [
+            kSecClass: kSecClassGenericPassword, kSecAttrService: keychainService,
+            kSecAttrAccount: account, kSecReturnData: true, kSecMatchLimit: kSecMatchLimitOne,
+        ]
+        var result: AnyObject?
+        guard SecItemCopyMatching(query as CFDictionary, &result) == errSecSuccess, let data = result as? Data,
+              let value = String(data: data, encoding: .utf8), !value.isEmpty else { return nil }
+        return value
+    }
+
+    private static func setKeychainValue(_ value: String, for account: String) {
         let base: [CFString: Any] = [kSecClass: kSecClassGenericPassword, kSecAttrService: keychainService,
-                                     kSecAttrAccount: "api-key"]
+                                     kSecAttrAccount: account]
         SecItemDelete(base as CFDictionary)
-        let trimmed = key.trimmingCharacters(in: .whitespacesAndNewlines)
+        let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return }
         var add = base
         add[kSecValueData] = Data(trimmed.utf8)
@@ -556,6 +569,7 @@ enum DeepSeekUsage {
     }
 
     static func fetch() async throws -> ProviderUsage {
+        if let token = sessionToken { return try await fetchAccount(token: token) }
         guard let key = apiKey else { throw UsageError.notSetUp }
         let data: Data
         do {
@@ -579,9 +593,100 @@ enum DeepSeekUsage {
         ])
     }
 
+    // MARK: Account (DeepSeek Platform)
+
+    /// Reads the endpoints platform.deepseek.com's own usage page uses (as codenotch does):
+    /// the account summary (wallets and total spend) and the last 30 days of tokens,
+    /// requests and cost per API key and model.
+    static func fetchAccount(token: String) async throws -> ProviderUsage {
+        let calendar = Calendar.current
+        let today = calendar.startOfDay(for: Date())
+        let start = calendar.date(byAdding: .day, value: -29, to: today)!
+        let end = calendar.date(byAdding: .day, value: 1, to: today)!
+        let query = "start=\(Int(start.timeIntervalSince1970))&end=\(Int(end.timeIntervalSince1970))"
+            + "&tz=\(TimeZone.current.secondsFromGMT())"
+        async let summary = platformData("api/v0/users/get_user_summary", token: token)
+        async let amount = platformData("api/v0/usage/by_api_key/amount?\(query)", token: token)
+        async let cost = platformData("api/v0/usage/by_api_key/cost?\(query)", token: token)
+        let (summaryData, amountData, costData) = try await (summary, amount, cost)
+
+        // One wallet per currency; the one actually funded or used is the account's.
+        let wallets = summaryData["normal_wallets"] as? [[String: Any]] ?? []
+        let costs = summaryData["total_costs"] as? [[String: Any]] ?? []
+        let readings = wallets.compactMap { wallet -> (currency: String, balance: Double, spent: Double)? in
+            guard let currency = wallet["currency"] as? String, let balance = JSONValue.number(wallet["balance"])
+            else { return nil }
+            let spent = costs.first { $0["currency"] as? String == currency }
+                .flatMap { JSONValue.number($0["amount"]) } ?? 0
+            return (currency, balance, spent)
+        }
+        guard let wallet = readings.max(by: { $0.balance + $0.spent < $1.balance + $1.spent })
+        else { throw UsageError.problem("Unexpected response") }
+
+        var windows = [
+            UsageWindow(id: "balance", label: "Balance", used: wallet.balance > 0 ? 0 : 1, resetsAt: nil,
+                        amount: format(wallet.balance, wallet.currency),
+                        detail: "\(format(wallet.spent, wallet.currency)) spent in total"),
+        ]
+
+        // Last 30 days: tokens and requests from `amount`, cost from `cost`.
+        var tokens = 0.0, requests = 0.0
+        for series in amountData["series"] as? [[String: Any]] ?? [] {
+            for bucket in series["buckets"] as? [[String: Any]] ?? [] {
+                let usage = bucket["usage"] as? [String: Any] ?? [:]
+                tokens += ["PROMPT_CACHE_HIT_TOKEN", "PROMPT_CACHE_MISS_TOKEN", "RESPONSE_TOKEN"]
+                    .reduce(0) { $0 + (JSONValue.number(usage[$1]) ?? 0) }
+                requests += JSONValue.number(usage["REQUEST"]) ?? 0
+            }
+        }
+        let currencies = costData["data"] as? [[String: Any]] ?? []
+        let spending = currencies.first { $0["currency"] as? String == wallet.currency } ?? currencies.first
+        var spent = 0.0
+        for series in spending?["series"] as? [[String: Any]] ?? [] {
+            for bucket in series["buckets"] as? [[String: Any]] ?? [] {
+                spent += JSONValue.number(bucket["cost"]) ?? 0
+            }
+        }
+        windows.append(UsageWindow(
+            id: "month", label: "Last 30 days", used: 0, resetsAt: nil,
+            amount: format(spent, spending?["currency"] as? String ?? wallet.currency),
+            detail: "\(compact(tokens)) tokens · \(compact(requests)) requests"))
+        return .ok(plan: nil, windows: windows)
+    }
+
+    /// One Platform call; returns its `data.biz_data`. The Platform answers HTTP 200 even
+    /// when the session has ended, with an error `code` in the body.
+    private static func platformData(_ path: String, token: String) async throws -> [String: Any] {
+        let data: Data
+        do {
+            data = try await UsageHTTP.get(URL(string: path, relativeTo: platform)!, headers: [
+                "Authorization": "Bearer \(token)", "Accept": "application/json", "x-client-platform": "web",
+            ])
+        } catch UsageError.problem(let message) where message == "Sign in again" {
+            throw UsageError.problem("Sign in to DeepSeek again")
+        }
+        guard let root = JSONValue.object(data) else { throw UsageError.problem("Unexpected response") }
+        if let code = JSONValue.number(root["code"]), code != 0 {
+            throw UsageError.problem(code >= 40000 && code < 41000 ? "Sign in to DeepSeek again" : "Usage unavailable right now")
+        }
+        guard let biz = JSONValue.value(at: "data.biz_data", in: root) as? [String: Any]
+        else { throw UsageError.problem("Unexpected response") }
+        return biz
+    }
+
     static func format(_ value: Double, _ currency: String) -> String {
         let symbol = switch currency { case "USD": "$"; case "CNY": "¥"; default: currency + " " }
         return symbol + String(format: "%.2f", value)
+    }
+
+    /// 1234 → "1.2K", 3400000 → "3.4M".
+    static func compact(_ value: Double) -> String {
+        switch value {
+        case 1e9...: String(format: "%.1fB", value / 1e9)
+        case 1e6...: String(format: "%.1fM", value / 1e6)
+        case 1e3...: String(format: "%.1fK", value / 1e3)
+        default: String(Int(value))
+        }
     }
 }
 
