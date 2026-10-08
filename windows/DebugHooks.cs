@@ -99,6 +99,11 @@ public sealed class DebugHooks
                 for (var i = 0; i < all.Count; i++)
                     Snap(all[i].Content as FrameworkElement, $"snap-{name}{(i == 0 ? "" : $"-{i}")}.png", black: false);
                 if (settingsWindow() is { Content: FrameworkElement settings }) Snap(settings, $"snap-{name}-settings.png", black: true);
+                // Anything else that's open, like the start-with-Windows question.
+                var others = Application.Current.Windows.OfType<Window>()
+                    .Where(w => w is not NotchWindow && w != settingsWindow() && w.IsVisible).ToList();
+                for (var i = 0; i < others.Count; i++)
+                    Snap(others[i].Content as FrameworkElement, $"snap-{name}-window{i}.png", black: true);
                 break;
         }
     }

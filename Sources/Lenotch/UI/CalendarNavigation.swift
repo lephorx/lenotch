@@ -63,7 +63,10 @@ private struct CalendarWheelNavigation: NSViewRepresentable {
             monitor = NSEvent.addLocalMonitorForEvents(matching: .scrollWheel) { [weak self] event in
                 guard let self, let window = self.window, event.window === window,
                       !self.isHiddenOrHasHiddenAncestor,
-                      self.visibleRect.contains(self.convert(event.locationInWindow, from: nil)) else { return event }
+                      // Its own bounds: in the notch's hosting view `visibleRect` spans the whole
+                      // window, which made every scroll in the open notch move the calendar
+                      // instead of switching tabs.
+                      self.bounds.contains(self.convert(event.locationInWindow, from: nil)) else { return event }
                 self.scroll(event)
                 return nil
             }

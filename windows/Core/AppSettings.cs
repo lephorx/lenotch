@@ -89,6 +89,9 @@ public sealed class AppSettings
     // MARK: Setup
     private bool hasPlayedIntro;
     public bool HasPlayedIntro { get => hasPlayedIntro; set => Set(ref hasPlayedIntro, value); }
+    /// The first-launch question about starting with Windows was answered.
+    private bool askedAboutStartup;
+    public bool AskedAboutStartup { get => askedAboutStartup; set => Set(ref askedAboutStartup, value); }
     private string? lastSeenVersion;
     public string? LastSeenVersion { get => lastSeenVersion; set => Set(ref lastSeenVersion, value); }
 
@@ -188,7 +191,7 @@ public sealed class AppSettings
     public bool ShowPrivacyIndicator { get => showPrivacyIndicator; set => Set(ref showPrivacyIndicator, value); }
     private bool privacyGlow;
     public bool PrivacyGlow { get => privacyGlow; set => Set(ref privacyGlow, value); }
-    private bool showNetworkSpeed = true;
+    private bool showNetworkSpeed;
     public bool ShowNetworkSpeed { get => showNetworkSpeed; set => Set(ref showNetworkSpeed, value); }
     private bool showCrypto;
     public bool ShowCrypto { get => showCrypto; set => Set(ref showCrypto, value); }

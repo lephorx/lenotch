@@ -15,8 +15,11 @@ using Lenotch.Services;
 
 namespace Lenotch.AI;
 
-/// One usage limit window, e.g. the 5-hour session or the week.
-public sealed record UsageWindow(string Id, string Label, double Used, DateTime? ResetsAt);
+/// One usage limit window, e.g. the 5-hour session or the week. `Amount` is a balance
+/// shown instead of a percentage (e.g. "$12.34"); `Used` is then 0 while the account
+/// can make requests and 1 when it can't. `Detail` adds a line in the hover bubble.
+public sealed record UsageWindow(string Id, string Label, double Used, DateTime? ResetsAt,
+                                 string? Amount = null, string? Detail = null);
 
 public abstract record ProviderUsage
 {
@@ -95,6 +98,7 @@ public sealed class AIUsageService
                 AIProvider.Kimi => await KimiUsage.Fetch(),
                 AIProvider.Opencode => await OpenCodeUsage.Fetch(),
                 AIProvider.Amp => await AmpUsage.Fetch(),
+                AIProvider.DeepSeek => await DeepSeekUsage.Fetch(),
                 _ => new ProviderUsage.NotSetUp(),
             };
         }
@@ -530,6 +534,85 @@ internal static class AmpUsage
         }
         throw UsageException.Problem("Couldn't read Amp's balance");
     }
+}
+
+// MARK: - DeepSeek
+
+/// DeepSeek has no local sign-in to read, so its API key is entered in Settings
+/// (encrypted for this Windows user) or taken from DEEPSEEK_API_KEY. The API
+/// reports a balance, not a limit.
+public static class DeepSeekUsage
+{
+    private static string KeyFile => Path.Combine(Core.AppSettings.Folder, "Keys", "deepseek.bin");
+
+    /// Whether a key is saved in Lenotch (not counting the environment variable).
+    public static bool HasSavedKey => File.Exists(KeyFile);
+
+    public static string? ApiKey
+    {
+        get
+        {
+            try
+            {
+                if (File.Exists(KeyFile))
+                    return Encoding.UTF8.GetString(System.Security.Cryptography.ProtectedData.Unprotect(
+                        File.ReadAllBytes(KeyFile), null, System.Security.Cryptography.DataProtectionScope.CurrentUser));
+            }
+            catch (Exception) { }
+            var env = Environment.GetEnvironmentVariable("DEEPSEEK_API_KEY");
+            return string.IsNullOrWhiteSpace(env) ? null : env.Trim();
+        }
+    }
+
+    /// Saves the key; an empty one removes it.
+    public static void SaveApiKey(string key)
+    {
+        try
+        {
+            var trimmed = key.Trim();
+            if (trimmed.Length == 0) { File.Delete(KeyFile); return; }
+            Directory.CreateDirectory(Path.GetDirectoryName(KeyFile)!);
+            File.WriteAllBytes(KeyFile, System.Security.Cryptography.ProtectedData.Protect(
+                Encoding.UTF8.GetBytes(trimmed), null, System.Security.Cryptography.DataProtectionScope.CurrentUser));
+        }
+        catch (Exception) { }
+    }
+
+    public static async Task<ProviderUsage> Fetch()
+    {
+        if (ApiKey is not { } key) throw UsageException.NotSetUp;
+        string text;
+        try
+        {
+            text = await UsageHttp.Get("https://api.deepseek.com/user/balance", new()
+            {
+                ["Authorization"] = $"Bearer {key}",
+                ["Accept"] = "application/json",
+            });
+        }
+        catch (UsageException error) when (error.Message == "Sign in again")
+        {
+            throw UsageException.Problem("Check your DeepSeek API key");
+        }
+        var root = UsageHttp.ParseJson(text);
+        if (root.Get("balance_infos") is not { ValueKind: JsonValueKind.Array } infos || infos.GetArrayLength() == 0)
+            throw UsageException.Problem("Unexpected response");
+        var list = infos.EnumerateArray().ToList();
+        var info = list.FirstOrDefault(i => i.Get("currency").AsString() == "USD");
+        if (info.ValueKind != JsonValueKind.Object) info = list[0];
+        var currency = info.Get("currency").AsString() ?? "USD";
+        var total = info.Get("total_balance").AsNumber() ?? 0;
+        var granted = info.Get("granted_balance").AsNumber() ?? 0;
+        var available = root.Get("is_available") is { } flag ? flag.ValueKind == JsonValueKind.True : total > 0;
+        return new ProviderUsage.Ok(null, new List<UsageWindow>
+        {
+            new("balance", "Balance", available ? 0 : 1, null, Format(total, currency),
+                granted > 0 ? $"{Format(granted, currency)} granted" : null),
+        });
+    }
+
+    public static string Format(double value, string currency) =>
+        (currency switch { "USD" => "$", "CNY" => "¥", _ => currency + " " }) + value.ToString("0.00", CultureInfo.InvariantCulture);
 }
 
 // MARK: - Custom

@@ -115,7 +115,7 @@ public sealed class AIUsageView : NotchContentView
 
     public static string UsageKey(ProviderUsage usage) => usage switch
     {
-        ProviderUsage.Ok ok => "ok" + ok.Plan + string.Join(",", ok.Windows.Select(w => $"{w.Id}={w.Used:0.###}@{w.ResetsAt:O}")),
+        ProviderUsage.Ok ok => "ok" + ok.Plan + string.Join(",", ok.Windows.Select(w => $"{w.Id}={w.Used:0.###}@{w.ResetsAt:O}{w.Amount}")),
         ProviderUsage.Problem problem => "problem" + problem.Message,
         _ => usage.GetType().Name,
     };
@@ -124,7 +124,10 @@ public sealed class AIUsageView : NotchContentView
     {
         var lineWidth = diameter > 44 ? 5 : 4;
         var ring = new RingView(lineWidth) { Width = diameter, Height = diameter };
-        if (usage.Headline is { } headline) ring.Set(headline.Used, UsageColor.Of(headline.Used), Ui.Frozen(Color.FromRgb(51, 51, 51)));
+        if (usage.Headline is { Amount: not null } balance)
+            // A balance: a full ring, green while the account can be used, red when it can't.
+            ring.Set(1, UsageColor.Of(balance.Used >= 1 ? 1 : 0), Ui.Frozen(Color.FromRgb(51, 51, 51)));
+        else if (usage.Headline is { } headline) ring.Set(headline.Used, UsageColor.Of(headline.Used), Ui.Frozen(Color.FromRgb(51, 51, 51)));
         else ring.Set(0, Brushes.Transparent, Ui.Frozen(Color.FromRgb(51, 51, 51)));
         var glyph = source.GlyphView(diameter * 0.4);
         glyph.HorizontalAlignment = HorizontalAlignment.Center;
@@ -141,6 +144,8 @@ public sealed class AIUsageView : NotchContentView
 
         FrameworkElement label = usage switch
         {
+            ProviderUsage.Ok when usage.Headline?.Amount is { } amount =>
+                new Viewbox { Child = Ui.Text(amount, diameter > 44 ? 15 : 12, FontWeights.Medium, Brushes.White, true), MaxWidth = diameter + 22, StretchDirection = StretchDirection.DownOnly },
             ProviderUsage.Ok => Ui.Text($"{Math.Round((usage.Headline?.Used ?? 0) * 100)}%", diameter > 44 ? 15 : 12, FontWeights.Medium, Brushes.White, true),
             ProviderUsage.Loading => Ui.Text("–", diameter > 44 ? 15 : 12, FontWeights.Medium, Brushes.White),
             _ => Ui.Icon(Glyphs.Warning, diameter > 44 ? 13 : 11, Ui.Orange),
@@ -274,6 +279,19 @@ public sealed class UsageTooltip : Canvas
         }
         head.Children.Add(Ui.Text(window.Label, 13, FontWeights.Normal, Brushes.White));
         block.Children.Add(head);
+        if (window.Amount is { } amount)
+        {
+            var value = Ui.Text(amount, 22, FontWeights.SemiBold, window.Used >= 1 ? UsageColor.Of(1) : Brushes.White, true);
+            value.Margin = new Thickness(0, 6, 0, 0);
+            block.Children.Add(value);
+            if (window.Detail is { } detail)
+            {
+                var detailText = Ui.Text(detail, 12, FontWeights.Normal, Ui.White(0.45));
+                detailText.Margin = new Thickness(0, 4, 0, 0);
+                block.Children.Add(detailText);
+            }
+            return block;
+        }
 
         var used = Math.Clamp(window.Used, 0, 1);
         var bar = new Grid { Height = 6, Margin = new Thickness(0, 6, 0, 0) };

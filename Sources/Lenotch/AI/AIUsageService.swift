@@ -9,6 +9,11 @@ struct UsageWindow: Identifiable, Equatable {
     /// 0...1
     let used: Double
     let resetsAt: Date?
+    /// A balance to show instead of a percentage (e.g. "$12.34"); `used` is then 0
+    /// while the account can make requests and 1 when it can't.
+    var amount: String? = nil
+    /// Extra line in the hover bubble for an amount (e.g. "$2.00 granted").
+    var detail: String? = nil
 }
 
 enum ProviderUsage: Equatable {
@@ -63,6 +68,7 @@ final class AIUsageService {
             case .kimi: return try await KimiUsage.fetch()
             case .opencode: return try await OpenCodeUsage.fetch()
             case .amp: return try await AmpUsage.fetch()
+            case .deepseek: return try await DeepSeekUsage.fetch()
             case nil: return .notSetUp
             }
         } catch UsageError.notSetUp {
@@ -507,6 +513,75 @@ enum AmpUsage {
         guard let regex = try? NSRegularExpression(pattern: pattern, options: [.caseInsensitive]),
               let match = regex.firstMatch(in: text, range: NSRange(text.startIndex..., in: text)) else { return nil }
         return (1..<match.numberOfRanges).compactMap { Range(match.range(at: $0), in: text).map { String(text[$0]) } }
+    }
+}
+
+// MARK: - DeepSeek
+
+/// DeepSeek has no local sign-in to read, so its API key is entered in Settings (kept
+/// in the keychain) or taken from DEEPSEEK_API_KEY. The API reports a balance, not a limit.
+enum DeepSeekUsage {
+    private static let keychainService = "com.lephorx.Lenotch.deepseek"
+
+    static var apiKey: String? {
+        let query: [CFString: Any] = [
+            kSecClass: kSecClassGenericPassword, kSecAttrService: keychainService,
+            kSecAttrAccount: "api-key", kSecReturnData: true, kSecMatchLimit: kSecMatchLimitOne,
+        ]
+        var result: AnyObject?
+        if SecItemCopyMatching(query as CFDictionary, &result) == errSecSuccess, let data = result as? Data,
+           let key = String(data: data, encoding: .utf8), !key.isEmpty {
+            return key
+        }
+        return ProcessInfo.processInfo.environment["DEEPSEEK_API_KEY"].flatMap { $0.isEmpty ? nil : $0 }
+    }
+
+    /// Whether a key is saved in Lenotch (not counting the environment variable).
+    static var hasSavedKey: Bool {
+        let query: [CFString: Any] = [kSecClass: kSecClassGenericPassword, kSecAttrService: keychainService,
+                                      kSecAttrAccount: "api-key"]
+        return SecItemCopyMatching(query as CFDictionary, nil) == errSecSuccess
+    }
+
+    /// Saves the key; an empty one removes it.
+    static func saveAPIKey(_ key: String) {
+        let base: [CFString: Any] = [kSecClass: kSecClassGenericPassword, kSecAttrService: keychainService,
+                                     kSecAttrAccount: "api-key"]
+        SecItemDelete(base as CFDictionary)
+        let trimmed = key.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return }
+        var add = base
+        add[kSecValueData] = Data(trimmed.utf8)
+        SecItemAdd(add as CFDictionary, nil)
+    }
+
+    static func fetch() async throws -> ProviderUsage {
+        guard let key = apiKey else { throw UsageError.notSetUp }
+        let data: Data
+        do {
+            data = try await UsageHTTP.get(URL(string: "https://api.deepseek.com/user/balance")!,
+                                           headers: ["Authorization": "Bearer \(key)", "Accept": "application/json"])
+        } catch UsageError.problem(let message) where message == "Sign in again" {
+            throw UsageError.problem("Check your DeepSeek API key")
+        }
+        guard let root = JSONValue.object(data),
+              let infos = root["balance_infos"] as? [[String: Any]], !infos.isEmpty
+        else { throw UsageError.problem("Unexpected response") }
+        let info = infos.first { $0["currency"] as? String == "USD" } ?? infos[0]
+        let currency = info["currency"] as? String ?? "USD"
+        let total = JSONValue.number(info["total_balance"]) ?? 0
+        let granted = JSONValue.number(info["granted_balance"]) ?? 0
+        let available = root["is_available"] as? Bool ?? (total > 0)
+        return .ok(plan: nil, windows: [
+            UsageWindow(id: "balance", label: "Balance", used: available ? 0 : 1, resetsAt: nil,
+                        amount: format(total, currency),
+                        detail: granted > 0 ? "\(format(granted, currency)) granted" : nil),
+        ])
+    }
+
+    static func format(_ value: Double, _ currency: String) -> String {
+        let symbol = switch currency { case "USD": "$"; case "CNY": "¥"; default: currency + " " }
+        return symbol + String(format: "%.2f", value)
     }
 }
 

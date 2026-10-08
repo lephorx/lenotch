@@ -107,9 +107,15 @@ public sealed class App : Application
             After(1.0, PlayIntro);
             After(4.2, () =>
             {
+                AskAboutStartup();
                 ShowSettings();
                 tray?.ShowBalloon("Lenotch is running", "Hover the top of your screen to open the notch. Settings are in the tray icon's menu.");
             });
+        }
+        else if (!settings.AskedAboutStartup)
+        {
+            // Installs from before the question existed get asked once too.
+            After(2.0, AskAboutStartup);
         }
         settings.LastSeenVersion = UpdateService.CurrentVersionText;
         if (settings.CheckForUpdates) After(8, async () => await services.Updates.Check());
@@ -292,6 +298,15 @@ public sealed class App : Application
     }
 
     // MARK: - Windows
+
+    /// Asks once whether Lenotch should start with Windows; yes adds it right away.
+    private void AskAboutStartup()
+    {
+        if (settings.AskedAboutStartup) return;
+        settings.AskedAboutStartup = true;
+        if (LaunchAtLogin.IsEnabled) return;
+        if (StartupPrompt.Ask()) LaunchAtLogin.IsEnabled = true;
+    }
 
     private void ShowSettings()
     {

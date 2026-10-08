@@ -83,6 +83,21 @@ private struct WindowBlock: View {
                 }
             }
             .font(.system(size: 12))
+            if let amount = window.amount {
+                Text(amount)
+                    .font(.system(size: 22, weight: .semibold).monospacedDigit())
+                    .foregroundStyle(window.used >= 1 ? UsageColor.of(1) : .white)
+                if let detail = window.detail {
+                    Text(detail).font(.system(size: 12)).foregroundStyle(.white.opacity(0.45))
+                }
+            } else {
+                bar
+            }
+        }
+    }
+
+    private var bar: some View {
+        Group {
             GeometryReader { proxy in
                 ZStack(alignment: .leading) {
                     Capsule().fill(Color(white: 0.2))
