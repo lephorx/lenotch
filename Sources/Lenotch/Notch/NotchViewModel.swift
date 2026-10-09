@@ -103,7 +103,7 @@ final class NotchViewModel {
         self.openSettings = openSettings
     }
 
-    var showsLiveActivity: Bool { media.track != nil && media.isPlaying }
+    var showsLiveActivity: Bool { settings.showLiveActivity && media.track != nil && media.isPlaying }
 
     /// Real audio levels for the equalizer, when that's turned on.
     var equalizerSource: AudioVisualizer? { settings.realAudioVisualizer ? visualizer : nil }
