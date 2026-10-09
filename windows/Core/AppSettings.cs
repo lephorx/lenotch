@@ -133,6 +133,9 @@ public sealed class AppSettings
     public bool ShowMusic { get => showMusic; set => Set(ref showMusic, value); }
     private AudioSource audioSource = AudioSource.NowPlaying;
     public AudioSource AudioSource { get => audioSource; set => Set(ref audioSource, value); }
+    /// Artwork and equalizer beside the closed notch while music plays.
+    private bool showLiveActivity = true;
+    public bool ShowLiveActivity { get => showLiveActivity; set => Set(ref showLiveActivity, value); }
     private bool peekOnTrackChange = true;
     public bool PeekOnTrackChange { get => peekOnTrackChange; set => Set(ref peekOnTrackChange, value); }
     private double trackPeekDuration = 3;

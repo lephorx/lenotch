@@ -256,6 +256,9 @@ public sealed class SettingsWindow : Window
         yield return Group("Source",
             Choice("Follow", Enum.GetValues<AudioSource>().Select(s => (s, s.Title())).ToArray(),
                 () => Settings.AudioSource, v => Settings.AudioSource = v));
+        yield return Group("Closed notch",
+            Toggle("Music in the closed notch", "Shows the cover and equalizer beside the notch while music plays.",
+                () => Settings.ShowLiveActivity, v => Settings.ShowLiveActivity = v));
         yield return Group("Song changes",
             Toggle("Peek when the song changes", "Shows the new song under the notch for a moment.",
                 () => Settings.PeekOnTrackChange, v => Settings.PeekOnTrackChange = v),

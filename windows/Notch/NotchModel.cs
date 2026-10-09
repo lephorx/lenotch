@@ -119,7 +119,7 @@ public sealed class NotchModel
     public bool ShowsNetwork => Settings.ShowNetworkSpeed && Network != null;
     public bool ShowsCrypto => Settings.ShowCrypto && Services.Crypto.Prices.Count > 0;
     public bool ShowsPrivacy => Settings.ShowPrivacyIndicator && !Privacy.IsEmpty;
-    public bool ShowsLiveActivity => Media.Track != null && Media.IsPlaying;
+    public bool ShowsLiveActivity => Settings.ShowLiveActivity && Media.Track != null && Media.IsPlaying;
     public bool ShowsCalendar => Settings.ShowCalendar;
 
     public Color? AccentColor => Media.AccentColor;
