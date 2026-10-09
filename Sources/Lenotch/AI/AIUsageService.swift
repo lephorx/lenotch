@@ -547,25 +547,11 @@ enum DeepSeekUsage {
     static func saveSessionToken(_ token: String) { setKeychainValue(token, for: sessionAccount) }
 
     private static func keychainValue(_ account: String) -> String? {
-        let query: [CFString: Any] = [
-            kSecClass: kSecClassGenericPassword, kSecAttrService: keychainService,
-            kSecAttrAccount: account, kSecReturnData: true, kSecMatchLimit: kSecMatchLimitOne,
-        ]
-        var result: AnyObject?
-        guard SecItemCopyMatching(query as CFDictionary, &result) == errSecSuccess, let data = result as? Data,
-              let value = String(data: data, encoding: .utf8), !value.isEmpty else { return nil }
-        return value
+        Keychain.value(service: keychainService, account: account)
     }
 
     private static func setKeychainValue(_ value: String, for account: String) {
-        let base: [CFString: Any] = [kSecClass: kSecClassGenericPassword, kSecAttrService: keychainService,
-                                     kSecAttrAccount: account]
-        SecItemDelete(base as CFDictionary)
-        let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmed.isEmpty else { return }
-        var add = base
-        add[kSecValueData] = Data(trimmed.utf8)
-        SecItemAdd(add as CFDictionary, nil)
+        Keychain.set(value, service: keychainService, account: account)
     }
 
     static func fetch() async throws -> ProviderUsage {
