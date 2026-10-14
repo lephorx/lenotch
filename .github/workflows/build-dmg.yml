@@ -137,6 +137,7 @@ jobs:
           Send "snap closed"
           Send "hold"
           Send "snap player"
+          Get-Content (Join-Path $dir "lenotch-debug.txt") -ErrorAction SilentlyContinue
           Send "page 1"
           Send "snap shelf"
           Send "ai on"
