@@ -465,6 +465,11 @@ private struct MusicSettings: View {
                     }
                 }
                 Section {
+                    Toggle("Music in the closed notch", isOn: $settings.showLiveActivity)
+                } footer: {
+                    Text("Shows the cover and equalizer beside the closed notch while music plays.")
+                }
+                Section {
                     Toggle("Peek when the song changes", isOn: $settings.peekOnTrackChange)
                     if settings.peekOnTrackChange {
                         LabeledContent("Show for") {

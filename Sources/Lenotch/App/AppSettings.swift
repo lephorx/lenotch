@@ -87,6 +87,8 @@ final class AppSettings {
     var showMusic: Bool { didSet { save(showMusic, "showMusic") } }
     /// Briefly show the new song in the closed notch when the track changes.
     var peekOnTrackChange: Bool { didSet { save(peekOnTrackChange, "peekOnTrackChange") } }
+    /// Artwork and equalizer beside the closed notch while music plays.
+    var showLiveActivity: Bool { didSet { save(showLiveActivity, "showLiveActivity") } }
     /// Seconds the new song stays in the notch after a track change.
     var trackPeekDuration: Double { didSet { save(trackPeekDuration, "trackPeekDuration") } }
     /// Show volume changes beside the notch.
@@ -218,6 +220,7 @@ final class AppSettings {
         showCalendar = bool("showCalendar", true)
         showMusic = bool("showMusic", true)
         peekOnTrackChange = bool("peekOnTrackChange", true)
+        showLiveActivity = bool("showLiveActivity", true)
         trackPeekDuration = defaults.object(forKey: "trackPeekDuration") as? Double ?? 3
         showVolumeIndicator = bool("showVolumeIndicator", true)
         showBrightnessIndicator = bool("showBrightnessIndicator", true)
