@@ -30,6 +30,8 @@ public sealed class NotchWindow : Window
     private readonly DispatcherTimer pending = new();
     private readonly DispatcherTimer peekEnd = new();
     private readonly DispatcherTimer alarmEnd = new() { Interval = TimeSpan.FromSeconds(AlarmDuration) };
+    /// Shrinks the window once the notch has finished folding up.
+    private readonly DispatcherTimer shrink = new() { Interval = TimeSpan.FromSeconds(0.7) };
     private Action? pendingAction;
     private NotchContentView? content;
     private string contentKey = "";
@@ -41,6 +43,10 @@ public sealed class NotchWindow : Window
     private System.Windows.Forms.Screen screen;
     private double scale = 1;
     private (int x, int y) originPixels;
+    private int widthPixels;
+    /// The window's current height (DIP). A transparent window copies its whole surface
+    /// on every frame, so it's only as tall as the notch needs right now.
+    private double windowHeight;
     /// Shared, so the X on any screen silences it.
     private static MediaPlayer? alarm;
 
@@ -116,11 +122,20 @@ public sealed class NotchWindow : Window
         };
         peekEnd.Tick += (_, _) => { peekEnd.Stop(); model.IsPeeking = false; Update(); };
         alarmEnd.Tick += (_, _) => StopAlarm();
+        shrink.Tick += (_, _) =>
+        {
+            shrink.Stop();
+            if (NeededHeight() < windowHeight) SetWindowHeight(NeededHeight());
+        };
         poll.Tick += (_, _) => Poll();
 
         model.Changed += Update;
         model.PageChanged += Update;
-        model.UsageHoverChanged += PositionTooltip;
+        model.UsageHoverChanged += () =>
+        {
+            FitWindow();
+            PositionTooltip();
+        };
         model.StopAlarm = StopAlarm;
         model.Share = paths => ShareSheet.Share(hwnd, paths);
         model.ChooseAndShare = () => ShareSheet.ChooseAndShare(hwnd);
@@ -137,6 +152,7 @@ public sealed class NotchWindow : Window
         Closed += (_, _) =>
         {
             poll.Stop();
+            shrink.Stop();
             alarm?.Stop();
         };
         Update();
@@ -161,13 +177,12 @@ public sealed class NotchWindow : Window
             model.Geometry = new NotchGeometry(widthDip);
             ApplyGeometry();
         }
-        var size = model.Geometry.WindowSize;
-        var widthPx = (int)Math.Ceiling(size.Width * scale);
-        var heightPx = (int)Math.Ceiling(size.Height * scale);
-        originPixels = (bounds.Left + (bounds.Width - widthPx) / 2, bounds.Top);
+        widthPixels = (int)Math.Ceiling(model.Geometry.WindowSize.Width * scale);
+        originPixels = (bounds.Left + (bounds.Width - widthPixels) / 2, bounds.Top);
+        windowHeight = NeededHeight();
         if (hwnd != IntPtr.Zero)
-            Native.SetWindowPos(hwnd, Native.HWND_TOPMOST, originPixels.x, originPixels.y, widthPx, heightPx,
-                Native.SWP_NOACTIVATE | Native.SWP_SHOWWINDOW);
+            Native.SetWindowPos(hwnd, Native.HWND_TOPMOST, originPixels.x, originPixels.y, widthPixels,
+                (int)Math.Ceiling(windowHeight * scale), Native.SWP_NOACTIVATE | Native.SWP_SHOWWINDOW);
         Update();
     }
 
@@ -176,8 +191,45 @@ public sealed class NotchWindow : Window
         var size = model.Geometry.WindowSize;
         root.Width = size.Width;
         root.Height = size.Height;
+        windowHeight = NeededHeight();
         Width = size.Width;
-        Height = size.Height;
+        Height = windowHeight;
+    }
+
+    /// The height the window needs now: the closed states, the open notch, or the open
+    /// notch with the AI usage bubble below it.
+    private double NeededHeight()
+    {
+        var geometry = model.Geometry;
+        if (!model.IsOpen) return geometry.ClosedWindowHeight;
+        return model.UsageHover != null ? geometry.WindowSize.Height : geometry.OpenWindowHeight;
+    }
+
+    /// Grows the window straight away; shrinks it only after the notch has folded up.
+    private void FitWindow()
+    {
+        var needed = NeededHeight();
+        if (needed > windowHeight)
+        {
+            shrink.Stop();
+            SetWindowHeight(needed);
+        }
+        else if (needed < windowHeight)
+        {
+            if (!shrink.IsEnabled) shrink.Start();
+        }
+        else
+        {
+            shrink.Stop();
+        }
+    }
+
+    private void SetWindowHeight(double height)
+    {
+        windowHeight = height;
+        if (hwnd == IntPtr.Zero) return;
+        Native.SetWindowPos(hwnd, Native.HWND_TOPMOST, originPixels.x, originPixels.y, widthPixels,
+            (int)Math.Ceiling(height * scale), Native.SWP_NOACTIVATE);
     }
 
     /// Keeps the notch above other always-on-top windows.
@@ -210,6 +262,7 @@ public sealed class NotchWindow : Window
     /// Brings the notch's size, shape and content in line with the model.
     public void Update()
     {
+        FitWindow();
         var size = model.CurrentSize;
         var expanded = model.IsExpanded;
         if (size != shownSize || expanded != shownExpanded)
