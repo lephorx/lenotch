@@ -1,5 +1,4 @@
 import AppKit
-import Security
 import SwiftUI
 
 /// Built-in coding assistants whose usage limits the notch can show. Each is read
@@ -125,25 +124,11 @@ struct CustomAIProvider: Codable, Equatable, Identifiable {
             let path = (apiKeyFile as NSString).expandingTildeInPath
             return (try? String(contentsOfFile: path, encoding: .utf8))?.trimmingCharacters(in: .whitespacesAndNewlines)
         }
-        let query: [CFString: Any] = [
-            kSecClass: kSecClassGenericPassword, kSecAttrService: Self.keychainService,
-            kSecAttrAccount: id.uuidString, kSecReturnData: true, kSecMatchLimit: kSecMatchLimitOne,
-        ]
-        var result: AnyObject?
-        guard SecItemCopyMatching(query as CFDictionary, &result) == errSecSuccess,
-              let data = result as? Data else { return nil }
-        return String(data: data, encoding: .utf8)
+        return Keychain.value(service: Self.keychainService, account: id.uuidString)
     }
 
     func saveAPIKey(_ key: String) {
-        let base: [CFString: Any] = [kSecClass: kSecClassGenericPassword, kSecAttrService: Self.keychainService,
-                                     kSecAttrAccount: id.uuidString]
-        SecItemDelete(base as CFDictionary)
-        let trimmed = key.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmed.isEmpty else { return }
-        var add = base
-        add[kSecValueData] = Data(trimmed.utf8)
-        SecItemAdd(add as CFDictionary, nil)
+        Keychain.set(key, service: Self.keychainService, account: id.uuidString)
     }
 
     func deleteAPIKey() { saveAPIKey("") }

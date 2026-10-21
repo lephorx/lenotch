@@ -57,6 +57,13 @@ public sealed class NotchGeometry
 
     /// The window is sized for the widest page plus the bubble below; the black shape animates inside it.
     public Size WindowSize => new(OpenSize.Width + 2 * OpenTopRadius, NotchSize.Height + MaxBodyHeight + TooltipHeight);
+
+    /// Room below the shape for the spring's overshoot and the mic/camera glow.
+    private const double ShapeMargin = 20;
+    /// Window height while closed: the tallest closed state (the intro) fits.
+    public double ClosedWindowHeight => IntroSize.Height + ShapeMargin;
+    /// Window height while open, without the AI usage bubble.
+    public double OpenWindowHeight => NotchSize.Height + MaxBodyHeight + ShapeMargin;
 }
 
 /// Which ring the pointer is on, and where it is horizontally in the notch window.

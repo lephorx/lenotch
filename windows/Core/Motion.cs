@@ -89,9 +89,10 @@ public static class Motion
 
     /// Calls `tick` every frame (seconds since start) while the element is loaded,
     /// visible and the returned ticker is enabled. WPF keeps rendering every frame while
-    /// anyone listens, so tickers must be switched off when nothing moves.
+    /// anyone listens, so tickers must be switched off when nothing moves. The default
+    /// interval lets every frame of a 60 Hz display through and halves faster ones.
     public static FrameTicker OnFrame(FrameworkElement element, Action<double> tick, bool enabled = true,
-                                      double minimumInterval = 1.0 / 30) =>
+                                      double minimumInterval = 1.0 / 75) =>
         new(element, tick, enabled, minimumInterval);
 }
 

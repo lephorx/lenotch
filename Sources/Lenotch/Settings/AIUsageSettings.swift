@@ -7,6 +7,9 @@ struct AIUsageSettings: View {
 
     @State private var editing: CustomAIProvider?
     @State private var editingDeepSeekKey = false
+    @State private var editingCopilotAccount = false
+    /// Shown under Copilot's name; nil is gh's active account.
+    @State private var copilotAccount = CopilotUsage.account
 
     /// Every source, enabled ones first in their saved order.
     private var allKeys: [String] {
@@ -38,8 +41,10 @@ struct AIUsageSettings: View {
                         if let source = UsageSource.resolve(key, customs: settings.allCustomProviders) {
                             SourceRow(source: source,
                                       isOn: binding(for: key),
-                                      edit: source.custom.map { custom in { edit(custom) } }
-                                          ?? (key == AIProvider.deepseek.rawValue ? { editingDeepSeekKey = true } : nil))
+                                      subtitle: key == AIProvider.copilot.rawValue
+                                          ? copilotAccount.map { "GitHub CLI account \($0.split(separator: "/").last ?? "")" }
+                                          : nil,
+                                      edit: editAction(for: key, source: source))
                         }
                     }
                     .onMove(perform: move)
@@ -79,10 +84,27 @@ struct AIUsageSettings: View {
         .sheet(isPresented: $editingDeepSeekKey) {
             DeepSeekKeyEditor { editingDeepSeekKey = false }
         }
+        .sheet(isPresented: $editingCopilotAccount) {
+            CopilotAccountPicker {
+                editingCopilotAccount = false
+                copilotAccount = CopilotUsage.account
+            }
+        }
         .sheet(item: $editing) { provider in
             CustomProviderEditor(provider: provider,
                                  isNew: !settings.customProviders.contains { $0.id == provider.id },
                                  save: save, delete: delete)
+        }
+    }
+
+    private func editAction(for key: String, source: UsageSource) -> (title: String, action: () -> Void)? {
+        if let custom = source.custom {
+            return (custom.configFile != nil ? "Open File" : "Edit…", { edit(custom) })
+        }
+        switch AIProvider(rawValue: key) {
+        case .deepseek: return ("API Key…", { editingDeepSeekKey = true })
+        case .copilot: return ("Account…", { editingCopilotAccount = true })
+        default: return nil
         }
     }
 
@@ -150,7 +172,8 @@ struct AIUsageSettings: View {
 private struct SourceRow: View {
     let source: UsageSource
     @Binding var isOn: Bool
-    let edit: (() -> Void)?
+    var subtitle: String?
+    let edit: (title: String, action: () -> Void)?
 
     var body: some View {
         HStack(spacing: 10) {
@@ -171,7 +194,7 @@ private struct SourceRow: View {
                             .background(Capsule().fill(Color.accentColor.opacity(0.2)))
                     }
                 }
-                Text(source.custom.map { $0.url.isEmpty ? "Custom endpoint" : $0.url }
+                Text(subtitle ?? source.custom.map { $0.url.isEmpty ? "Custom endpoint" : $0.url }
                         ?? AIProvider(rawValue: source.id)?.source ?? "")
                     .font(.system(size: 10))
                     .foregroundStyle(.secondary)
@@ -180,9 +203,7 @@ private struct SourceRow: View {
             }
             Spacer()
             if let edit {
-                Button(source.custom?.configFile != nil ? "Open File"
-                       : source.custom == nil ? "API Key…" : "Edit…", action: edit)
-                    .buttonStyle(.borderless)
+                Button(edit.title, action: edit.action).buttonStyle(.borderless)
             }
             Toggle("", isOn: $isOn).labelsHidden().toggleStyle(.switch).controlSize(.small)
         }
@@ -448,6 +469,82 @@ private struct DeepSeekKeyEditor: View {
             result = "Sign in or enter a key first."
         } catch {
             result = "Couldn't reach DeepSeek."
+        }
+        testing = false
+    }
+}
+
+/// Sheet for Copilot: which GitHub CLI account to read, e.g. a Copilot Business account
+/// added with `gh auth login` next to a personal one.
+private struct CopilotAccountPicker: View {
+    let done: () -> Void
+    @State private var accounts: [CopilotUsage.Account]?
+    /// nil is gh's active account.
+    @State private var selection = CopilotUsage.account
+    @State private var result: String?
+    @State private var testing = false
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("Copilot Account").font(.system(size: 15, weight: .semibold))
+            Text("Lenotch reads Copilot through the GitHub CLI. If your Copilot Business seat is on another account, add it with `gh auth login` in Terminal and choose it here. `gh auth switch` still controls which account gh itself uses.")
+                .font(.system(size: 11))
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+
+            if let accounts {
+                Picker("Account", selection: $selection) {
+                    Text("Active account in gh" + (accounts.first { $0.active && $0.host == "github.com" }
+                        .map { " (\($0.login))" } ?? "")).tag(String?.none)
+                    ForEach(accounts) { Text($0.title).tag(Optional($0.id)) }
+                    // Keep a chosen account that gh no longer has visible, so it can be switched away from.
+                    if let selection, !accounts.contains(where: { $0.id == selection }) {
+                        Text("\(selection) (signed out)").tag(Optional(selection))
+                    }
+                }
+                .onChange(of: selection) { result = nil }
+                if accounts.isEmpty {
+                    Text("No GitHub CLI accounts found. Install gh and run `gh auth login`.")
+                        .font(.system(size: 11))
+                        .foregroundStyle(.orange)
+                }
+            } else {
+                ProgressView().controlSize(.small)
+            }
+            if let result {
+                Text(result).font(.system(size: 11)).foregroundStyle(.secondary)
+            }
+            HStack {
+                Spacer()
+                Button("Test") { Task { await test() } }.disabled(testing || accounts == nil)
+                Button("Cancel", action: done)
+                Button("Save") {
+                    CopilotUsage.account = selection
+                    AIUsageService.invalidated.insert(AIProvider.copilot.rawValue)
+                    done()
+                }
+                .keyboardShortcut(.defaultAction)
+            }
+        }
+        .padding(20)
+        .frame(width: 440)
+        .task { accounts = await CopilotUsage.accounts() }
+    }
+
+    private func test() async {
+        testing = true
+        do {
+            if case .ok(let plan, let windows) = try await CopilotUsage.fetch(account: selection) {
+                let premium = windows.first { $0.id == "premium_interactions" }
+                    .map { ", \(Int(($0.used * 100).rounded()))% of premium requests used" } ?? ""
+                result = "Works: \(plan ?? "Copilot") plan\(premium)."
+            }
+        } catch UsageError.problem(let message) {
+            result = message
+        } catch UsageError.notSetUp {
+            result = "This account has no Copilot plan."
+        } catch {
+            result = "Couldn't reach GitHub."
         }
         testing = false
     }

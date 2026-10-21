@@ -66,7 +66,8 @@ public sealed class DebugHooks
         var model = first.Model;
         var status = $"state={model.State} intro={model.IsShowingIntro} page={model.VisiblePage}/{model.Pages.Count} "
                      + $"size={model.CurrentSize} track={model.Media.Track?.Title ?? "-"} playing={model.Media.IsPlaying} "
-                     + $"screens={notches().Count} settings={(settingsWindow() != null)}\n";
+                     + $"screens={notches().Count} settings={(settingsWindow() != null)} "
+                     + $"window={first.ActualWidth:0}x{first.ActualHeight:0}\n";
         try { File.WriteAllText(Path.Combine(folder, "lenotch-debug.txt"), status); } catch (IOException) { }
     }
 

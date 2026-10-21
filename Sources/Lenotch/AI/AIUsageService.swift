@@ -33,13 +33,17 @@ final class AIUsageService {
     @ObservationIgnored private var lastRefresh: [String: Date] = [:]
     /// Providers' usage endpoints are rate limited; don't ask more often than this.
     private static let minimumInterval: TimeInterval = 60
+    /// Sources whose settings changed (e.g. another Copilot account); read again on the next poll.
+    static var invalidated: Set<String> = []
 
     func refresh(_ sources: [UsageSource], force: Bool = false) async {
         await withTaskGroup(of: (String, ProviderUsage?).self) { group in
             for source in sources {
-                if !force, let last = lastRefresh[source.id], Date().timeIntervalSince(last) < Self.minimumInterval {
+                if !force, !Self.invalidated.contains(source.id), let last = lastRefresh[source.id],
+                   Date().timeIntervalSince(last) < Self.minimumInterval {
                     continue
                 }
+                Self.invalidated.remove(source.id)
                 lastRefresh[source.id] = Date()
                 if usage[source.id] == nil { usage[source.id] = .loading }
                 group.addTask { (source.id, await Self.fetch(source)) }
@@ -247,8 +251,45 @@ enum CodexUsage {
 
 // MARK: - GitHub Copilot
 
-/// Copilot's quota, authenticated with the GitHub CLI's sign-in.
+/// Copilot's quota, authenticated with the GitHub CLI's sign-in. gh can hold several
+/// accounts (e.g. a personal one and a Copilot Business one); Settings picks which.
 enum CopilotUsage {
+    /// An account signed in to gh, from `gh auth status`.
+    struct Account: Hashable, Identifiable {
+        let host: String
+        let login: String
+        /// gh's current account for the host, used when none is chosen.
+        let active: Bool
+        var id: String { "\(host)/\(login)" }
+        var title: String { host == "github.com" ? login : "\(login) (\(host))" }
+    }
+
+    /// The chosen account as "host/login"; nil uses gh's active account.
+    static var account: String? {
+        get { UserDefaults.standard.string(forKey: "copilotAccount") }
+        set { UserDefaults.standard.set(newValue, forKey: "copilotAccount") }
+    }
+
+    private static var gh: String? {
+        ["/opt/homebrew/bin/gh", "/usr/local/bin/gh", "/usr/bin/gh"]
+            .first { FileManager.default.isExecutableFile(atPath: $0) }
+    }
+
+    /// Every account gh is signed in to, across hosts.
+    static func accounts() async -> [Account] {
+        guard let gh, let output = await UsageHTTP.run(gh, ["auth", "status", "--json", "hosts"]),
+              let hosts = JSONValue.object(Data(output.utf8))?["hosts"] as? [String: [[String: Any]]] else { return [] }
+        return hosts.sorted { $0.key == "github.com" || ($1.key != "github.com" && $0.key < $1.key) }
+            .flatMap { host, entries in
+                entries.compactMap { entry in
+                    (entry["login"] as? String).map {
+                        Account(host: host, login: $0, active: entry["active"] as? Bool ?? false)
+                    }
+                }
+            }
+    }
+
+
     private struct Response: Decodable {
         struct Quota: Decodable {
             let percent_remaining: Double?
@@ -259,18 +300,30 @@ enum CopilotUsage {
         let quota_snapshots: [String: Quota]?
     }
 
-    static func fetch() async throws -> ProviderUsage {
-        let gh = ["/opt/homebrew/bin/gh", "/usr/local/bin/gh", "/usr/bin/gh"]
-            .first { FileManager.default.isExecutableFile(atPath: $0) }
-        guard let gh, let token = await UsageHTTP.run(gh, ["auth", "token"]), !token.isEmpty else {
+    static func fetch(account: String? = account) async throws -> ProviderUsage {
+        var host = "github.com"
+        var arguments = ["auth", "token"]
+        if let account, let slash = account.lastIndex(of: "/") {
+            host = String(account[..<slash])
+            arguments += ["--hostname", host, "--user", String(account[account.index(after: slash)...])]
+        }
+        guard let gh else { throw UsageError.notSetUp }
+        guard let token = await UsageHTTP.run(gh, arguments), !token.isEmpty else {
+            // A chosen account that gh has since signed out of should say so rather than vanish.
+            if account != nil { throw UsageError.problem("Sign in to gh again") }
             throw UsageError.notSetUp
         }
-        let data = try await UsageHTTP.get(URL(string: "https://api.github.com/copilot_internal/user")!, headers: [
+        // GHE.com (data residency) has its API on api.<subdomain>.ghe.com.
+        let api = host == "github.com" || host.hasSuffix(".ghe.com") ? "https://api.\(host)" : "https://\(host)/api/v3"
+        let data = try await UsageHTTP.get(URL(string: "\(api)/copilot_internal/user")!, headers: [
             "Authorization": "token \(token)",
             "Accept": "application/json",
         ])
         let response = try JSONDecoder().decode(Response.self, from: data)
-        guard response.copilot_plan != nil else { throw UsageError.notSetUp }
+        guard response.copilot_plan != nil else {
+            if account != nil { throw UsageError.problem("No Copilot plan on this account") }
+            throw UsageError.notSetUp
+        }
 
         let resetsAt = response.quota_reset_date.flatMap { text -> Date? in
             let formatter = DateFormatter()
@@ -547,25 +600,11 @@ enum DeepSeekUsage {
     static func saveSessionToken(_ token: String) { setKeychainValue(token, for: sessionAccount) }
 
     private static func keychainValue(_ account: String) -> String? {
-        let query: [CFString: Any] = [
-            kSecClass: kSecClassGenericPassword, kSecAttrService: keychainService,
-            kSecAttrAccount: account, kSecReturnData: true, kSecMatchLimit: kSecMatchLimitOne,
-        ]
-        var result: AnyObject?
-        guard SecItemCopyMatching(query as CFDictionary, &result) == errSecSuccess, let data = result as? Data,
-              let value = String(data: data, encoding: .utf8), !value.isEmpty else { return nil }
-        return value
+        Keychain.value(service: keychainService, account: account)
     }
 
     private static func setKeychainValue(_ value: String, for account: String) {
-        let base: [CFString: Any] = [kSecClass: kSecClassGenericPassword, kSecAttrService: keychainService,
-                                     kSecAttrAccount: account]
-        SecItemDelete(base as CFDictionary)
-        let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmed.isEmpty else { return }
-        var add = base
-        add[kSecValueData] = Data(trimmed.utf8)
-        SecItemAdd(add as CFDictionary, nil)
+        Keychain.set(value, service: keychainService, account: account)
     }
 
     static func fetch() async throws -> ProviderUsage {
