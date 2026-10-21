@@ -207,6 +207,13 @@ public sealed class AppSettings
     /// Enabled usage sources in display order: built-in provider names or `custom:<uuid>`.
     private List<string> usageSourceKeys = new(AI.AIProviders.AllKeys);
     public List<string> UsageSourceKeys { get => usageSourceKeys; set => Set(ref usageSourceKeys, value); }
+    /// The GitHub CLI account Copilot is read with, as "host/login"; null is gh's active account.
+    private string? copilotAccount;
+    public string? CopilotAccount
+    {
+        get => copilotAccount;
+        set { Set(ref copilotAccount, value); AI.CopilotUsage.ChosenAccount = value; }
+    }
     private List<AI.CustomProvider> customProviders = new();
     public List<AI.CustomProvider> CustomProviders { get => customProviders; set => Set(ref customProviders, value); }
     private List<string> knownProviderConfigs = new();

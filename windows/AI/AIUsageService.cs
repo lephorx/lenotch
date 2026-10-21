@@ -310,21 +310,78 @@ internal static class CodexUsage
 
 // MARK: - GitHub Copilot
 
-/// Copilot's quota, authenticated with the GitHub CLI's sign-in.
+/// Copilot's quota, authenticated with the GitHub CLI's sign-in. gh can hold several
+/// accounts (e.g. a personal one and a Copilot Business one); Settings picks which.
 internal static class CopilotUsage
 {
-    public static async Task<ProviderUsage> Fetch()
+    /// An account signed in to gh, from `gh auth status`. `Active` is gh's current account for the host.
+    public sealed record Account(string Host, string Login, bool Active)
     {
-        var installed = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles), "GitHub CLI", "gh.exe");
-        var token = await UsageHttp.Run(File.Exists(installed) ? installed : "gh", "auth token");
-        if (string.IsNullOrEmpty(token)) throw UsageException.NotSetUp;
+        public string Id => $"{Host}/{Login}";
+        public string Title => Host == "github.com" ? Login : $"{Login} ({Host})";
+    }
 
-        var body = UsageHttp.ParseJson(await UsageHttp.Get("https://api.github.com/copilot_internal/user", new()
+    /// The chosen account as "host/login"; null uses gh's active account. Mirrors `AppSettings.CopilotAccount`.
+    public static string? ChosenAccount { get; set; }
+
+    private static string Gh
+    {
+        get
+        {
+            var installed = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles), "GitHub CLI", "gh.exe");
+            return File.Exists(installed) ? installed : "gh";
+        }
+    }
+
+    /// Every account gh is signed in to, across hosts.
+    public static async Task<List<Account>> Accounts()
+    {
+        var accounts = new List<Account>();
+        if (await UsageHttp.Run(Gh, "auth status --json hosts") is not { Length: > 0 } output) return accounts;
+        try
+        {
+            if (UsageHttp.ParseJson(output).Get("hosts") is not { ValueKind: JsonValueKind.Object } hosts) return accounts;
+            foreach (var host in hosts.EnumerateObject().OrderBy(h => h.Name == "github.com" ? "" : h.Name))
+            {
+                if (host.Value.ValueKind != JsonValueKind.Array) continue;
+                foreach (var entry in host.Value.EnumerateArray())
+                    if (entry.Get("login").AsString() is { Length: > 0 } login)
+                        accounts.Add(new Account(host.Name, login, entry.Get("active") is { ValueKind: JsonValueKind.True }));
+            }
+        }
+        catch (Exception) { }
+        return accounts;
+    }
+
+    public static Task<ProviderUsage> Fetch() => Fetch(ChosenAccount);
+
+    public static async Task<ProviderUsage> Fetch(string? account)
+    {
+        var host = "github.com";
+        var arguments = "auth token";
+        if (account is { Length: > 0 } && account.LastIndexOf('/') is var slash and > 0)
+        {
+            host = account[..slash];
+            arguments += $" --hostname {host} --user {account[(slash + 1)..]}";
+        }
+        else
+        {
+            account = null;
+        }
+        var token = await UsageHttp.Run(Gh, arguments);
+        if (string.IsNullOrEmpty(token))
+            // A chosen account that gh has since signed out of should say so rather than vanish.
+            throw account != null ? UsageException.Problem("Sign in to gh again") : UsageException.NotSetUp;
+
+        // GHE.com (data residency) has its API on api.<subdomain>.ghe.com.
+        var api = host == "github.com" || host.EndsWith(".ghe.com") ? $"https://api.{host}" : $"https://{host}/api/v3";
+        var body = UsageHttp.ParseJson(await UsageHttp.Get($"{api}/copilot_internal/user", new()
         {
             ["Authorization"] = $"token {token}",
             ["Accept"] = "application/json",
         }));
-        if (body.Get("copilot_plan").AsString() is not { } plan) throw UsageException.NotSetUp;
+        if (body.Get("copilot_plan").AsString() is not { } plan)
+            throw account != null ? UsageException.Problem("No Copilot plan on this account") : UsageException.NotSetUp;
         DateTime? resets = DateTime.TryParseExact(body.Get("quota_reset_date").AsString(), "yyyy-MM-dd",
             CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal, out var date) ? date.ToUniversalTime() : null;
         var snapshots = body.Get("quota_snapshots");

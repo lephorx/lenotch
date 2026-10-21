@@ -32,6 +32,9 @@ public sealed class SettingsWindow : Window
     private string? draftKey;
     private string testResult = "";
     private bool editingDeepSeek;
+    private bool editingCopilot;
+    /// gh's accounts for the Copilot picker; null until loaded.
+    private List<CopilotUsage.Account>? copilotAccounts;
 
     private AppSettings Settings => services.Settings;
 
@@ -461,10 +464,16 @@ public sealed class SettingsWindow : Window
         var rows = new List<UIElement>();
         foreach (var provider in builtIn)
         {
-            var detail = provider != AIProvider.DeepSeek ? provider.Source()
-                : DeepSeekUsage.IsSignedIn ? "Signed in" : DeepSeekUsage.HasSavedKey ? "API key saved" : provider.Source();
+            var detail = provider switch
+            {
+                AIProvider.DeepSeek when DeepSeekUsage.IsSignedIn => "Signed in",
+                AIProvider.DeepSeek when DeepSeekUsage.HasSavedKey => "API key saved",
+                AIProvider.Copilot when Settings.CopilotAccount is { } account => $"GitHub CLI account {account[(account.LastIndexOf('/') + 1)..]}",
+                _ => provider.Source(),
+            };
             rows.Add(SourceRow(new UsageSource(provider), detail, null));
             if (provider == AIProvider.DeepSeek && editingDeepSeek) rows.Add(DeepSeekKeyEditor());
+            if (provider == AIProvider.Copilot && editingCopilot) rows.Add(CopilotAccountEditor());
         }
         yield return Group("Providers", rows.ToArray());
 
@@ -526,6 +535,19 @@ public sealed class SettingsWindow : Window
             {
                 editingDeepSeek = !editingDeepSeek;
                 testResult = "";
+                ShowPage();
+            }, new Thickness(6, 0, 0, 0)));
+        }
+        if (source.BuiltIn == AIProvider.Copilot)
+        {
+            controls.Children.Add(SmallButton("Account…", async () =>
+            {
+                editingCopilot = !editingCopilot;
+                testResult = "";
+                copilotAccounts = null;
+                ShowPage();
+                if (!editingCopilot) return;
+                copilotAccounts = await CopilotUsage.Accounts();
                 ShowPage();
             }, new Thickness(6, 0, 0, 0)));
         }
@@ -660,6 +682,73 @@ public sealed class SettingsWindow : Window
             if (!Settings.UsageSourceKeys.Contains(AIProvider.DeepSeek.Key()))
                 Settings.UsageSourceKeys = Settings.UsageSourceKeys.Append(AIProvider.DeepSeek.Key()).ToList();
             editingDeepSeek = false;
+            _ = services.AIUsage.Refresh(Settings.UsageSources, force: true);
+            ShowPage();
+        }, new Thickness(8, 0, 0, 0));
+        save.Style = (Style)Application.Current.Resources["AccentButton"];
+        buttons.Children.Add(save);
+        form.Children.Add(buttons);
+        return new Border { Background = Ui.Frozen(Color.FromRgb(0x23, 0x23, 0x26)), Child = form };
+    }
+
+    /// Copilot: which GitHub CLI account to read, e.g. a Copilot Business account added
+    /// with `gh auth login` next to a personal one.
+    private UIElement CopilotAccountEditor()
+    {
+        var form = new StackPanel { Margin = new Thickness(14, 4, 14, 14) };
+        var hint = Ui.Text("Lenotch reads Copilot through the GitHub CLI. If your Copilot Business seat is on another account, add it with \"gh auth login\" and choose it here.",
+            12, FontWeights.Normal, SecondaryBrush);
+        hint.TextWrapping = TextWrapping.Wrap;
+        form.Children.Add(hint);
+        if (copilotAccounts is not { } accounts)
+        {
+            form.Children.Add(Ui.Text("Loading accounts…", 12, FontWeights.Normal, SecondaryBrush));
+            return new Border { Background = Ui.Frozen(Color.FromRgb(0x23, 0x23, 0x26)), Child = form };
+        }
+
+        // "" is gh's active account (ComboBox tags can't be null).
+        var selection = Settings.CopilotAccount ?? "";
+        var active = accounts.FirstOrDefault(a => a.Active && a.Host == "github.com");
+        var options = new List<(string, string)> { ("", active != null ? $"Active account in gh ({active.Login})" : "Active account in gh") };
+        options.AddRange(accounts.Select(a => (a.Id, a.Title)));
+        // Keep a chosen account that gh no longer has, so it can be switched away from.
+        if (selection != "" && accounts.All(a => a.Id != selection)) options.Add((selection, $"{selection} (signed out)"));
+        var result = Ui.Text(testResult, 12, FontWeights.Normal, SecondaryBrush);
+        result.TextWrapping = TextWrapping.Wrap;
+        form.Children.Add(Choice("Account", options.ToArray(), () => selection, value =>
+        {
+            selection = value;
+            result.Text = testResult = "";
+        }));
+        if (accounts.Count == 0)
+        {
+            var missing = Ui.Text("No GitHub CLI accounts found. Install gh and run \"gh auth login\".", 12, FontWeights.Normal, SecondaryBrush);
+            missing.TextWrapping = TextWrapping.Wrap;
+            form.Children.Add(missing);
+        }
+        form.Children.Add(result);
+        var buttons = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right, Margin = new Thickness(0, 10, 0, 0) };
+        buttons.Children.Add(SmallButton("Test", async () =>
+        {
+            result.Text = "Testing…";
+            try
+            {
+                var usage = await CopilotUsage.Fetch(selection);
+                var premium = usage.WindowList.FirstOrDefault(w => w.Id == "premium_interactions") is { } window
+                    ? $", {Math.Round(window.Used * 100)}% of premium requests used" : "";
+                testResult = usage is ProviderUsage.Ok ok ? $"Works: {ok.Plan ?? "Copilot"} plan{premium}." : "No reading.";
+            }
+            catch (Exception error)
+            {
+                testResult = error.Message is { Length: > 0 } message ? message : "This account has no Copilot plan.";
+            }
+            result.Text = testResult;
+        }));
+        buttons.Children.Add(SmallButton("Cancel", () => { editingCopilot = false; ShowPage(); }, new Thickness(8, 0, 0, 0)));
+        var save = SmallButton("Save", () =>
+        {
+            Settings.CopilotAccount = selection == "" ? null : selection;
+            editingCopilot = false;
             _ = services.AIUsage.Refresh(Settings.UsageSources, force: true);
             ShowPage();
         }, new Thickness(8, 0, 0, 0));
