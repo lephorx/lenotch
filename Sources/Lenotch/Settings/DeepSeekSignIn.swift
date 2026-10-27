@@ -51,7 +51,11 @@ final class DeepSeekSignIn: NSObject, NSWindowDelegate {
                       webView.url?.host == DeepSeekUsage.platform.host,
                       let token = await self.pageToken(webView), token != checked else { continue }
                 checked = token
-                guard (try? await DeepSeekUsage.fetchAccount(token: token)) != nil else { continue }
+                // Only a session DeepSeek turns down keeps the window waiting; any other
+                // failure (say the usage endpoints change) shows in the notch instead.
+                do { _ = try await DeepSeekUsage.fetchAccount(token: token) }
+                catch UsageError.problem(let message) where message == "Sign in to DeepSeek again" { continue }
+                catch {}
                 DeepSeekUsage.saveSessionToken(token)
                 self.finish(signedIn: true)
                 return

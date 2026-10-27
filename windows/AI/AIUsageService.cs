@@ -693,10 +693,13 @@ public static class DeepSeekUsage
     /// tokens, requests and cost per API key and model.
     public static async Task<ProviderUsage> FetchAccount(string token)
     {
-        var today = DateTime.Today;
-        long Seconds(DateTime day) => new DateTimeOffset(day).ToUnixTimeSeconds();
-        var tz = (int)TimeZoneInfo.Local.GetUtcOffset(DateTime.Now).TotalSeconds;
-        var query = $"start={Seconds(today.AddDays(-29))}&end={Seconds(today.AddDays(1))}&tz={tz}";
+        // Days at one fixed offset (whole hours), the way the Platform's own page asks: the
+        // range must start and end at midnight for `tz`, so it's counted in plain 24-hour
+        // days. Calendar days broke it once daylight saving time changed within the range.
+        var tz = (long)Math.Floor(TimeZoneInfo.Local.GetUtcOffset(DateTime.Now).TotalSeconds / 3600) * 3600;
+        var local = DateTimeOffset.UtcNow.ToUnixTimeSeconds() + tz;
+        var today = local - local % 86400 - tz;
+        var query = $"start={today - 29 * 86400}&end={today + 86400}&tz={tz}";
         var summaryTask = PlatformData("api/v0/users/get_user_summary", token);
         var amountTask = PlatformData($"api/v0/usage/by_api_key/amount?{query}", token);
         var costTask = PlatformData($"api/v0/usage/by_api_key/cost?{query}", token);
@@ -769,6 +772,9 @@ public static class DeepSeekUsage
         var root = UsageHttp.ParseJson(text);
         if (root.Get("code").AsNumber() is { } code && code != 0)
             throw UsageException.Problem(code is >= 40000 and < 41000 ? "Sign in to DeepSeek again" : "Usage unavailable right now");
+        // A rejected request (e.g. INVALID_PARAM) has `code` 0 but a `biz_code` and no data.
+        if (root.At("data.biz_code").AsNumber() is { } bizCode && bizCode != 0)
+            throw UsageException.Problem("Usage unavailable right now");
         if (root.At("data.biz_data") is not { ValueKind: JsonValueKind.Object } biz)
             throw UsageException.Problem("Unexpected response");
         return biz;
