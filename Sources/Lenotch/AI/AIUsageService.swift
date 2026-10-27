@@ -638,12 +638,13 @@ enum DeepSeekUsage {
     /// the account summary (wallets and total spend) and the last 30 days of tokens,
     /// requests and cost per API key and model.
     static func fetchAccount(token: String) async throws -> ProviderUsage {
-        let calendar = Calendar.current
-        let today = calendar.startOfDay(for: Date())
-        let start = calendar.date(byAdding: .day, value: -29, to: today)!
-        let end = calendar.date(byAdding: .day, value: 1, to: today)!
-        let query = "start=\(Int(start.timeIntervalSince1970))&end=\(Int(end.timeIntervalSince1970))"
-            + "&tz=\(TimeZone.current.secondsFromGMT())"
+        // Days at one fixed offset (whole hours), the way the Platform's own page asks: the
+        // range must start and end at midnight for `tz`, so it's counted in plain 24-hour
+        // days. Calendar days broke it once daylight saving time changed within the range.
+        let tz = Int((Double(TimeZone.current.secondsFromGMT()) / 3600).rounded(.down)) * 3600
+        let local = Int(Date().timeIntervalSince1970) + tz
+        let today = local - local % 86400 - tz
+        let query = "start=\(today - 29 * 86400)&end=\(today + 86400)&tz=\(tz)"
         async let summary = platformData("api/v0/users/get_user_summary", token: token)
         async let amount = platformData("api/v0/usage/by_api_key/amount?\(query)", token: token)
         async let cost = platformData("api/v0/usage/by_api_key/cost?\(query)", token: token)
@@ -707,6 +708,10 @@ enum DeepSeekUsage {
         guard let root = JSONValue.object(data) else { throw UsageError.problem("Unexpected response") }
         if let code = JSONValue.number(root["code"]), code != 0 {
             throw UsageError.problem(code >= 40000 && code < 41000 ? "Sign in to DeepSeek again" : "Usage unavailable right now")
+        }
+        // A rejected request (e.g. INVALID_PARAM) has `code` 0 but a `biz_code` and no data.
+        if let code = JSONValue.number(JSONValue.value(at: "data.biz_code", in: root)), code != 0 {
+            throw UsageError.problem("Usage unavailable right now")
         }
         guard let biz = JSONValue.value(at: "data.biz_data", in: root) as? [String: Any]
         else { throw UsageError.problem("Unexpected response") }
