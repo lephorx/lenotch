@@ -103,7 +103,11 @@ public sealed class DeepSeekSignIn : Window
             if (token.StartsWith("Bearer ", StringComparison.Ordinal)) token = token[7..];
             if (token == checkedToken) return;
             checkedToken = token;
-            await DeepSeekUsage.FetchAccount(token);
+            // Only a session DeepSeek turns down keeps the window waiting; any other
+            // failure (say the usage endpoints change) shows in the notch instead.
+            try { await DeepSeekUsage.FetchAccount(token); }
+            catch (UsageException error) when (error.Message == "Sign in to DeepSeek again") { return; }
+            catch (Exception) { }
             DeepSeekUsage.SaveSessionToken(token);
             SignedIn = true;
             Close();
