@@ -165,12 +165,10 @@ final class AppleScriptProvider: PlaybackProvider {
 
     /// Only talk to the player once the user has allowed it (Settings → Permissions);
     /// sending an Apple Event without permission would make macOS ask on its own.
-    private var isAllowed: Bool { Self.isAllowed(player.bundleIdentifier) }
-
-    static func isAllowed(_ bundleIdentifier: String) -> Bool {
-        let target = NSAppleEventDescriptor(bundleIdentifier: bundleIdentifier)
-        guard let descriptor = target.aeDesc else { return false }
-        return AEDeterminePermissionToAutomateTarget(descriptor, typeWildCard, typeWildCard, false) == noErr
+    /// Uses the last known answer and checks again in the background, since macOS's check can hang.
+    private var isAllowed: Bool {
+        AutomationAccess.shared.check(player.bundleIdentifier)
+        return AutomationAccess.shared.isAllowed(player.bundleIdentifier)
     }
 
     private func command(_ body: String) {
