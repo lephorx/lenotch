@@ -24,7 +24,10 @@ final class PermissionCenter {
     private(set) var camera: Status = .notAsked
     /// macOS can't tell "not asked" from "denied" here; both show as `.notAsked`.
     private(set) var accessibility: Status = .notAsked
-    private(set) var automation: [String: Status] = [:]
+    /// Read from `AutomationAccess`, whose check can hang; apps not checked yet show as `.notAsked`.
+    var automation: [String: Status] {
+        AutomationAccess.shared.results.mapValues(Self.automationStatus)
+    }
 
     @ObservationIgnored private let settings: AppSettings
     @ObservationIgnored private let startAudioTap: () -> Void
@@ -62,7 +65,7 @@ final class PermissionCenter {
         }
         accessibility = AXIsProcessTrusted() ? .granted : .notAsked
         for app in controllableApps {
-            automation[app.id] = Self.automationStatus(app.id, ask: false)
+            AutomationAccess.shared.check(app.id)
         }
     }
 
@@ -107,13 +110,7 @@ final class PermissionCenter {
 
     func requestAutomation(_ app: ControllableApp) {
         onPromptStarted?()
-        DispatchQueue.global(qos: .userInitiated).async {
-            let status = Self.automationStatus(app.id, ask: true)
-            DispatchQueue.main.async {
-                self.automation[app.id] = status
-                self.finished()
-            }
-        }
+        AutomationAccess.shared.check(app.id, ask: true) { _ in self.finished() }
     }
 
     private func finished() {
@@ -125,10 +122,7 @@ final class PermissionCenter {
         NSWorkspace.shared.open(URL(string: "x-apple.systempreferences:com.apple.preference.security?\(pane)")!)
     }
 
-    private static func automationStatus(_ bundleID: String, ask: Bool) -> Status {
-        let target = NSAppleEventDescriptor(bundleIdentifier: bundleID)
-        guard let descriptor = target.aeDesc else { return .notAsked }
-        let result = AEDeterminePermissionToAutomateTarget(descriptor, typeWildCard, typeWildCard, ask)
+    private static func automationStatus(_ result: OSStatus) -> Status {
         switch result {
         case noErr: return .granted
         case OSStatus(errAEEventNotPermitted): return .denied

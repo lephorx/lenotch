@@ -42,7 +42,7 @@ enum AIProvider: String, Codable, CaseIterable, Identifiable {
         case .claude: .outline(GlyphOutline.claude)
         case .codex: .outline(GlyphOutline.openai)
         case .cursor: .outline(GlyphOutline.cursor)
-        case .copilot: .outline(GlyphOutline.copilot)
+        case .copilot: .image("glyph-copilot")
         case .grok: .outline(GlyphOutline.grok)
         case .kimi: .outline(GlyphOutline.kimi)
         case .opencode: .outline(GlyphOutline.opencode)

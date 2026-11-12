@@ -108,8 +108,9 @@ struct ExpandedView: View {
     }
 
     private var idleHint: String {
+        // Only once macOS has answered: its check can hang, so it never runs here.
         if let bundleID = media.source.bundleIdentifiers.first, media.source == .spotify || media.source == .appleMusic,
-           !AppleScriptProvider.isAllowed(bundleID) {
+           let result = AutomationAccess.shared.results[bundleID], result != noErr {
             return "Allow control of \(media.source.title) in Settings → Permissions."
         }
         return switch media.source {
